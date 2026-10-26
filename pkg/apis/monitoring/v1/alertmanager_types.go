@@ -372,6 +372,27 @@ type AlertmanagerSpec struct {
 	// +optional
 	AlertmanagerConfigMatcherStrategy AlertmanagerConfigMatcherStrategy `json:"alertmanagerConfigMatcherStrategy,omitempty"`
 
+	// alertmanagerConfigFileSystemMode defines how the operator handles
+	// AlertmanagerConfig resources which have references to the Alertmanager
+	// container's filesystem (as opposed to secret key references). Users
+	// controlling the receiver's service may create an AlertmanagerConfig
+	// resource with a reference to a container's file (for instance using
+	// `botTokenFile` for the Telegram receiver) and exfiltrate sensitive
+	// content from files located in the Alertmanager container.
+	//
+	// Supported values are:
+	// - "DenyAll" denies any AlertmanagerConfig resource referencing files from the container's filesystem, non-compliant resources are rejected.
+	// - "FromAlertmanagerConfigMatcherStrategy" uses the `alertmanagerConfigNamespaceSelector` field to make a decision
+	//   - When `alertmanagerConfigNamespaceSelector` is "None", it is equivalent to "AllowAll"
+	//   - When `alertmanagerConfigNamespaceSelector` is "OnNamespaceExceptForAlertmanagerNamespace", it is equivalent to "AllowAll" for the AlertmanagerConfig resources located in the Alertmanager's namespace and "DenyAll" for all other resources.
+	//   - When `alertmanagerConfigNamespaceSelector` is "OnNamespace", it is equivalent to "AllowAll" for the main AlertmanagerConfig resource (defined in `.spec.alertmanagerConfig.name`) and "DenyAll" for all other resources.
+	// - "AllowAll" allows any AlertmanagerConfig resource to reference files from the container's filesystem (use with caution).
+	//
+	// By default, the operator uses the "FromAlertmanagerConfigMatcherStrategy" mode.
+	//
+	// +optional
+	AlertmanagerConfigFileSystemMode *AlertmanagerConfigFileSystemMode `json:"alertmanagerConfigFileSystemMode,omitempty"`
+
 	// minReadySeconds defines the minimum number of seconds for which a newly
 	// created pod should be ready without any of its container crashing for it
 	// to be considered available.
@@ -497,6 +518,28 @@ const (
 	// With `None`, the route and inhibition rules of an AlertmanagerConfig
 	// object process all incoming alerts.
 	NoneConfigMatcherStrategyType AlertmanagerConfigMatcherStrategyType = "None"
+)
+
+// +kubebuilder:validation:Enum="AllowAll";"FromAlertmanagerConfigMatcherStrategy";"DenyAll"
+type AlertmanagerConfigFileSystemMode string
+
+const (
+	// DenyAllAlertmanagerConfigFileSystemMode ("DenyAll") denies any
+	// AlertmanagerConfig resource which references files from the Alertmanager
+	// container's filesystem.
+	DenyAllAlertmanagerConfigFileSystemMode AlertmanagerConfigFileSystemMode = "DenyAll"
+
+	// AllowAllAlertmanagerConfigFileSystemMode ("AllowAll") allows any
+	// AlertmanagerConfig resource to reference files from the Alertmanager
+	// container's filesystem.
+	AllowAllAlertmanagerConfigFileSystemMode AlertmanagerConfigFileSystemMode = "AllowAll"
+
+	// FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode
+	// ("FromAlertmanagerConfigMatcherStrategy") uses the
+	// `alertmanagerConfigNamespaceSelector` field to make a decision on
+	// denying/allowing AlertmanagerConfig resources which reference files from
+	// the Alertmanager container's filesystem.
+	FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode AlertmanagerConfigFileSystemMode = "FromAlertmanagerConfigMatcherStrategy"
 )
 
 // AlertmanagerConfiguration defines the Alertmanager configuration.

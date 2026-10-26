@@ -508,6 +508,11 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	out.AlertmanagerConfigMatcherStrategy = in.AlertmanagerConfigMatcherStrategy
+	if in.AlertmanagerConfigFileSystemMode != nil {
+		in, out := &in.AlertmanagerConfigFileSystemMode, &out.AlertmanagerConfigFileSystemMode
+		*out = new(AlertmanagerConfigFileSystemMode)
+		**out = **in
+	}
 	if in.MinReadySeconds != nil {
 		in, out := &in.MinReadySeconds, &out.MinReadySeconds
 		*out = new(int32)

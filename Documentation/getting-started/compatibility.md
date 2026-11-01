@@ -91,6 +91,7 @@ Prometheus Operator supports all Prometheus versions >= v2.0.0. The operator's e
 * v3.13.2
 * v3.13.3
 * v3.13.4
+* v3.13.5
 * v3.14.0
 ```
 
@@ -117,5 +118,5 @@ The Prometheus Operator is compatible with Thanos v0.10 and above.
 The end-to-end tests are mostly tested against
 
 ```$ mdox-exec="go run ./cmd/po-docgen/. compatibility defaultThanosVersion"
-* v0.42.4
+* v0.42.5
 ```

@@ -64,7 +64,7 @@ func TestValidateGlobalTelegramConfig(t *testing.T) {
 				},
 			},
 			expectErr: true,
-			errMsg:    new("only one of 'botToken' or 'botTokenfile' must be configured"),
+			errMsg:    new("telegram: only one of 'botToken' or 'botTokenfile' must be configured"),
 		},
 	}
 	for _, tc := range testCases {

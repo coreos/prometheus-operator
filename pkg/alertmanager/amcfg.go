@@ -584,6 +584,16 @@ func (cb *ConfigBuilder) convertRoute(in *monitoringv1alpha1.Route, crKey types.
 		}
 	}
 
+	// The AlertmanagerConfig resource is already rejected during resource
+	// selection when labels are used with Alertmanager < 0.34.0.
+	var labels map[string]string
+	if l := len(in.Labels); l > 0 {
+		labels = make(map[string]string, l)
+		for _, kv := range in.Labels {
+			labels[kv.Key] = kv.Value
+		}
+	}
+
 	return &route{
 		Receiver:            receiver,
 		GroupByStr:          in.GroupBy,
@@ -597,6 +607,7 @@ func (cb *ConfigBuilder) convertRoute(in *monitoringv1alpha1.Route, crKey types.
 		Routes:              routes,
 		MuteTimeIntervals:   prefixedMuteTimeIntervals,
 		ActiveTimeIntervals: prefixedActiveTimeIntervals,
+		Labels:              labels,
 	}
 }
 
@@ -1415,6 +1426,8 @@ func (cb *ConfigBuilder) convertPushoverConfig(ctx context.Context, in monitorin
 		Message:       ptr.Deref(in.Message, ""),
 		URLTitle:      ptr.Deref(in.URLTitle, ""),
 		Priority:      ptr.Deref(in.Priority, ""),
+		Sound:         ptr.Deref(in.Sound, ""),
+		Device:        ptr.Deref(in.Device, ""),
 		HTML:          in.HTML,
 		Monospace:     in.Monospace,
 	}
@@ -1425,10 +1438,6 @@ func (cb *ConfigBuilder) convertPushoverConfig(ctx context.Context, in monitorin
 
 	if in.TTL != nil {
 		out.TTL = string(*in.TTL)
-	}
-
-	if in.Device != nil {
-		out.Device = *in.Device
 	}
 
 	{
@@ -2906,8 +2915,8 @@ func (poc *pushoverConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 		*poc.Monospace = false
 	}
 
-	if poc.HTML != nil && *poc.HTML && poc.Monospace != nil && *poc.Monospace {
-		return errors.New("either monospace or html must be configured")
+	if ptr.Deref(poc.HTML, false) && ptr.Deref(poc.Monospace, false) {
+		return errors.New("'html' and 'monospace' options are mutually exclusive")
 	}
 
 	if poc.URL != "" {
@@ -2965,7 +2974,7 @@ func (sc *slackConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 			sc.UpdateMessage = nil
 		} else if *sc.UpdateMessage && sc.APIURL != "" {
 			if sc.APIURL != "https://slack.com/api/chat.postMessage" {
-				return fmt.Errorf(`update_message' can only be used with bot tokens. api_url must be set to https://slack.com/api/chat.postMessage`)
+				return fmt.Errorf(`'update_message' can only be used with bot tokens. api_url must be set to https://slack.com/api/chat.postMessage`)
 			}
 		}
 	}
@@ -3575,6 +3584,7 @@ func (r *route) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	matchersV2Allowed := amVersion.GTE(semver.MustParse("0.22.0"))
 	muteTimeIntervalsAllowed := matchersV2Allowed
 	activeTimeIntervalsAllowed := amVersion.GTE(semver.MustParse("0.24.0"))
+	labelsAllowed := amVersion.GTE(semver.MustParse("0.34.0"))
 	withLogger := logger.With("receiver", r.Receiver)
 
 	if !matchersV2Allowed && checkNotEmptyStrSlice(r.Matchers) {
@@ -3596,6 +3606,12 @@ func (r *route) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 		msg := "active time intervals in route is supported in Alertmanager >= 0.24.0 only - dropping config"
 		withLogger.Warn(msg, "active_time_intervals", fmt.Sprint(r.ActiveTimeIntervals))
 		r.ActiveTimeIntervals = nil
+	}
+
+	if !labelsAllowed && checkNotEmptyMap(r.Labels) {
+		msg := "'labels' in route is supported in Alertmanager >= 0.34.0 only - dropping config"
+		withLogger.Warn(msg, "labels", fmt.Sprint(r.Labels))
+		r.Labels = nil
 	}
 
 	if r.GroupWait != "" {

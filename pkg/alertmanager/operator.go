@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/cespare/xxhash/v2"
 	"github.com/mitchellh/hashstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
@@ -129,14 +130,6 @@ func WithStorageClassValidation() ControllerOption {
 	}
 }
 
-// WithConfigResourceStatus tells that the controller can manage the status of
-// configuration resources.
-func WithConfigResourceStatus() ControllerOption {
-	return func(o *Operator) {
-		o.configResourcesStatusEnabled = true
-	}
-}
-
 // New creates a new controller.
 func New(ctx context.Context, restConfig *rest.Config, c operator.Config, logger *slog.Logger, r prometheus.Registerer, options ...ControllerOption) (*Operator, error) {
 	logger = logger.With("component", controllerName)
@@ -191,7 +184,8 @@ func New(ctx context.Context, restConfig *rest.Config, c operator.Config, logger
 			WatchObjectRefsInAllNamespaces: c.WatchObjectRefsInAllNamespaces,
 		},
 
-		finalizerSyncer: operator.NewNoopFinalizerSyncer(),
+		configResourcesStatusEnabled: c.Gates.Enabled(operator.StatusForConfigurationResourcesFeature),
+		finalizerSyncer:              operator.NewNoopFinalizerSyncer(),
 	}
 	for _, opt := range options {
 		opt(o)
@@ -694,10 +688,10 @@ func (c *Operator) sync(ctx context.Context, key string) (func(context.Context) 
 		return closure, fmt.Errorf("failed to synchronize the web config secret: %w", err)
 	}
 
-	// TODO(simonpasquier): the operator should take into account changes to
-	// the cluster TLS configuration to trigger a rollout of the pods (this
-	// configuration doesn't support live reload).
-	if err := c.createOrUpdateClusterTLSConfigSecret(ctx, am); err != nil {
+	// A change to the cluster TLS configuration triggers a rollout of the pods
+	// (this configuration doesn't support live reload).
+	clusterTLSConfigHash, err := c.createOrUpdateClusterTLSConfigSecret(ctx, am)
+	if err != nil {
 		return closure, fmt.Errorf("failed to synchronize the cluster TLS config secret: %w", err)
 	}
 
@@ -729,12 +723,12 @@ func (c *Operator) sync(ctx context.Context, key string) (func(context.Context) 
 		return closure, nil
 	}
 
-	newSSetInputHash, err := createSSetInputHash(*am, c.config, tlsShardedSecret, existingStatefulSet.Spec)
+	newSSetInputHash, err := createSSetInputHash(*am, c.config, tlsShardedSecret, existingStatefulSet.Spec, clusterTLSConfigHash)
 	if err != nil {
 		return closure, err
 	}
 
-	sset, err := makeStatefulSet(logger, am, c.config, newSSetInputHash, tlsShardedSecret)
+	sset, err := makeStatefulSet(logger, am, c.config, newSSetInputHash, clusterTLSConfigHash, tlsShardedSecret)
 	if err != nil {
 		return closure, fmt.Errorf("failed to generate statefulset: %w", err)
 	}
@@ -899,7 +893,7 @@ func labelSelectorForStatefulSets() string {
 	)
 }
 
-func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *operator.ShardedSecret, s appsv1.StatefulSetSpec) (string, error) {
+func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *operator.ShardedSecret, s appsv1.StatefulSetSpec, clusterTLSConfigHash string) (string, error) {
 	var http2 *bool
 	if a.Spec.Web != nil && a.Spec.Web.HTTPConfig != nil {
 		http2 = a.Spec.Web.HTTPConfig.HTTP2
@@ -918,6 +912,7 @@ func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *opera
 		Config                  Config
 		StatefulSetSpec         appsv1.StatefulSetSpec
 		ShardedSecret           *operator.ShardedSecret
+		ClusterTLSConfigHash    string
 	}{
 		AlertmanagerLabels:      a.Labels,
 		AlertmanagerAnnotations: a.Annotations,
@@ -926,6 +921,7 @@ func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *opera
 		Config:                  c,
 		StatefulSetSpec:         s,
 		ShardedSecret:           tlsAssets,
+		ClusterTLSConfigHash:    clusterTLSConfigHash,
 	},
 		nil,
 	)
@@ -1245,6 +1241,13 @@ func checkRoute(ctx context.Context, route *monitoringv1alpha1.Route, amVersion 
 			route.Matchers, route.Receiver)
 	}
 
+	if len(route.Labels) > 0 && !amVersion.GTE(semver.MustParse("0.34.0")) {
+		return fmt.Errorf(
+			"'labels' config set in 'route' but supported in Alertmanager >= 0.34.0 only - current %s",
+			amVersion.String(),
+		)
+	}
+
 	childRoutes, err := route.ChildRoutes()
 	if err != nil {
 		return err
@@ -1381,18 +1384,18 @@ func checkPagerDutyConfigs(
 ) error {
 	for _, config := range configs {
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
-			return err
+			return fmt.Errorf("httpConfig: %w", err)
 		}
 
 		if config.RoutingKey != nil {
-			if _, err := store.GetSecretKey(ctx, namespace, *config.RoutingKey); err != nil {
-				return err
+			if _, err := store.GetSecretKey(ctx, namespace, *config.RoutingKey, validation.NotEmpty); err != nil {
+				return fmt.Errorf("routingKey: %w", err)
 			}
 		}
 
 		if config.ServiceKey != nil {
-			if _, err := store.GetSecretKey(ctx, namespace, *config.ServiceKey); err != nil {
-				return err
+			if _, err := store.GetSecretKey(ctx, namespace, *config.ServiceKey, validation.NotEmpty); err != nil {
+				return fmt.Errorf("serviceKey: %w", err)
 			}
 		}
 
@@ -1455,7 +1458,7 @@ func checkDiscordConfigs(
 	}
 
 	if amVersion.LT(semver.MustParse("0.25.0")) {
-		return fmt.Errorf(`discordConfigs' is available in Alertmanager >= 0.25.0 only - current %s`, amVersion)
+		return fmt.Errorf(`'discordConfigs' is available in Alertmanager >= 0.25.0 only - current %s`, amVersion)
 	}
 
 	for _, config := range configs {
@@ -1491,7 +1494,7 @@ func checkRocketChatConfigs(
 	}
 
 	if amVersion.LT(semver.MustParse("0.28.0")) {
-		return fmt.Errorf(`rocketChatConfigs' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
+		return fmt.Errorf(`'rocketChatConfigs' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 	}
 
 	for _, config := range configs {
@@ -1540,16 +1543,16 @@ func checkSlackConfigs(
 		}
 
 		if config.MessageText != nil && amVersion.LT(semver.MustParse("0.31.0")) {
-			return fmt.Errorf(`messageText' is available in Alertmanager >= 0.31.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'messageText' is available in Alertmanager >= 0.31.0 only - current %s`, amVersion)
 		}
 
 		if config.UpdateMessage != nil {
 			if amVersion.LT(semver.MustParse("0.32.0")) {
-				return fmt.Errorf(`updateMessage' is available in Alertmanager >= 0.32.0 only - current %s`, amVersion)
+				return fmt.Errorf(`'updateMessage' is available in Alertmanager >= 0.32.0 only - current %s`, amVersion)
 			}
 			if *config.UpdateMessage && slackAPIURL != "" {
 				if slackAPIURL != "https://slack.com/api/chat.postMessage" {
-					return fmt.Errorf(`updateMessage' can only be used with bot tokens. API URL must be set to https://slack.com/api/chat.postMessage`)
+					return fmt.Errorf(`'updateMessage' can only be used with bot tokens. API URL must be set to https://slack.com/api/chat.postMessage`)
 				}
 			}
 		}
@@ -1586,7 +1589,7 @@ func checkWebhookConfigs(
 		}
 
 		if config.Payload != nil && amVersion.LT(semver.MustParse("0.32.0")) {
-			return fmt.Errorf(`payload' is available in Alertmanager >= 0.32.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'payload' is available in Alertmanager >= 0.32.0 only - current %s`, amVersion)
 		}
 
 		if err := configureHTTPConfigInStore(ctx, config.HTTPConfig, namespace, store); err != nil {
@@ -1635,12 +1638,27 @@ func checkWebexConfigs(
 	}
 
 	if amVersion.LT(semver.MustParse("0.25.0")) {
-		return fmt.Errorf(`webexConfigs' is available in Alertmanager >= 0.25.0 only - current %s`, amVersion)
+		return fmt.Errorf(`'webexConfigs' is available in Alertmanager >= 0.25.0 only - current %s`, amVersion)
 	}
 
 	for _, config := range configs {
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
 			return err
+		}
+
+		// Alertmanager refuses a Webex receiver whose credentials are empty.
+		if config.HTTPConfig != nil {
+			if config.HTTPConfig.Authorization != nil {
+				if _, err := store.GetSecretKey(ctx, namespace, *config.HTTPConfig.Authorization.Credentials, validation.NotEmpty); err != nil {
+					return fmt.Errorf("httpConfig.authorization: %w", err)
+				}
+			}
+
+			if config.HTTPConfig.BearerTokenSecret != nil {
+				if _, err := store.GetSecretKey(ctx, namespace, *config.HTTPConfig.BearerTokenSecret, validation.NotEmpty); err != nil {
+					return fmt.Errorf("httpConfig.bearerTokenSecret: %w", err)
+				}
+			}
 		}
 
 		if err := configureHTTPConfigInStore(ctx, config.HTTPConfig, namespace, store); err != nil {
@@ -1675,11 +1693,11 @@ func checkEmailConfigs(
 		}
 
 		if config.ForceImplicitTLS != nil && amVersion.LT(semver.MustParse("0.31.0")) {
-			return fmt.Errorf(`forceImplicitTLS' is available in Alertmanager >= 0.31.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'forceImplicitTLS' is available in Alertmanager >= 0.31.0 only - current %s`, amVersion)
 		}
 
 		if config.Threading != nil && amVersion.LT(semver.MustParse("0.30.0")) {
-			return fmt.Errorf(`threading' is available in Alertmanager >= 0.30.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'threading' is available in Alertmanager >= 0.30.0 only - current %s`, amVersion)
 		}
 	}
 
@@ -1720,15 +1738,14 @@ func checkPushoverConfigs(
 ) error {
 	checkSecret := func(secret *corev1.SecretKeySelector, name string) error {
 		if secret == nil {
-			return fmt.Errorf("mandatory field %s is empty", name)
+			return nil
 		}
-		s, err := store.GetSecretKey(ctx, namespace, *secret)
+
+		_, err := store.GetSecretKey(ctx, namespace, *secret, validation.NotEmpty)
 		if err != nil {
-			return err
+			return fmt.Errorf("'%s': %w", name, err)
 		}
-		if s == "" {
-			return errors.New("mandatory field userKey is empty")
-		}
+
 		return nil
 	}
 
@@ -1736,15 +1753,13 @@ func checkPushoverConfigs(
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
 			return err
 		}
+
 		if err := checkSecret(config.UserKey, "userKey"); err != nil {
 			return err
 		}
+
 		if err := checkSecret(config.Token, "token"); err != nil {
 			return err
-		}
-
-		if config.HTML != nil && *config.HTML && config.Monospace != nil && *config.Monospace {
-			return errors.New("html and monospace options are mutually exclusive")
 		}
 
 		if ptr.Deref(config.Expire, "") != "" {
@@ -1757,6 +1772,18 @@ func checkPushoverConfigs(
 			if _, err := model.ParseDuration(*config.Retry); err != nil {
 				return err
 			}
+		}
+
+		if amVersion.LT(semver.MustParse("0.26.0")) && config.UserKeyFile != nil {
+			return fmt.Errorf(`'userKeyFile' is available in Alertmanager >= 0.26.0 only - current %s`, amVersion)
+		}
+
+		if amVersion.LT(semver.MustParse("0.26.0")) && config.TokenFile != nil {
+			return fmt.Errorf(`'tokenFile' is available in Alertmanager >= 0.26.0 only - current %s`, amVersion)
+		}
+
+		if amVersion.LT(semver.MustParse("0.26.0")) && config.Device != nil {
+			return fmt.Errorf(`'device' is available in Alertmanager >= 0.26.0 only - current %s`, amVersion)
 		}
 
 		if err := configureHTTPConfigInStore(ctx, config.HTTPConfig, namespace, store); err != nil {
@@ -1776,7 +1803,7 @@ func checkSnsConfigs(
 ) error {
 	for _, config := range configs {
 		if amVersion.LT(semver.MustParse("0.33.0")) && config.UseAWSHTTPClient != nil {
-			return fmt.Errorf(`useAWSHTTPClient' is available in Alertmanager >= 0.33.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'useAWSHTTPClient' is available in Alertmanager >= 0.33.0 only - current %s`, amVersion)
 		}
 
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
@@ -1806,12 +1833,12 @@ func checkTelegramConfigs(
 	}
 
 	if amVersion.LT(semver.MustParse("0.24.0")) {
-		return fmt.Errorf(`telegramConfigs' is available in Alertmanager >= 0.24.0 only - current %s`, amVersion)
+		return fmt.Errorf(`'telegramConfigs' is available in Alertmanager >= 0.24.0 only - current %s`, amVersion)
 	}
 
 	for _, config := range configs {
 		if amVersion.LT(semver.MustParse("0.26.0")) && config.BotTokenFile != nil {
-			return fmt.Errorf(`botTokenFile' is available in Alertmanager >= 0.26.0 only - current %s`, amVersion)
+			return fmt.Errorf(`'botTokenFile' is available in Alertmanager >= 0.26.0 only - current %s`, amVersion)
 		}
 
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
@@ -1881,8 +1908,8 @@ func checkMSTeamsV2Configs(
 
 	for _, config := range configs {
 		if config.WebhookURL != nil {
-			if _, err := store.GetSecretKey(ctx, namespace, *config.WebhookURL); err != nil {
-				return err
+			if _, err := store.GetSecretKey(ctx, namespace, *config.WebhookURL, validation.NotEmpty); err != nil {
+				return fmt.Errorf("webhookURL: %w", err)
 			}
 		}
 
@@ -2008,15 +2035,15 @@ func (c *Operator) createOrUpdateWebConfigSecret(ctx context.Context, a *monitor
 	return nil
 }
 
-func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *monitoringv1.Alertmanager) error {
+func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *monitoringv1.Alertmanager) (string, error) {
 	clusterTLSConfig, err := clustertlsconfig.New(clusterTLSConfigDir, a)
 	if err != nil {
-		return fmt.Errorf("failed to initialize the configuration: %w", err)
+		return "", fmt.Errorf("failed to initialize the configuration: %w", err)
 	}
 
 	data, err := clusterTLSConfig.ClusterTLSConfiguration()
 	if err != nil {
-		return fmt.Errorf("failed to generate the configuration: %w", err)
+		return "", fmt.Errorf("failed to generate the configuration: %w", err)
 	}
 
 	s := &corev1.Secret{
@@ -2035,10 +2062,10 @@ func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *
 	)
 
 	if err = k8s.CreateOrUpdateSecret(ctx, c.kclient.CoreV1().Secrets(a.Namespace), s); err != nil {
-		return fmt.Errorf("failed to reconcile secret: %w", err)
+		return "", fmt.Errorf("failed to reconcile secret: %w", err)
 	}
 
-	return nil
+	return fmt.Sprintf("%x", xxhash.Sum64(data)), nil
 }
 
 func (c *Operator) recordDeprecatedFields(key string, logger *slog.Logger, a *monitoringv1.Alertmanager) {

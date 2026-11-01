@@ -40,6 +40,7 @@ func convertRouteFrom(in *v1alpha1.Route) (*Route, error) {
 		Matchers:            convertMatchersFrom(in.Matchers),
 		MuteTimeIntervals:   in.MuteTimeIntervals,
 		ActiveTimeIntervals: in.ActiveTimeIntervals,
+		Labels:              convertKeyValuesFrom(in.Labels),
 	}
 
 	// Deserialize child routes to convert them to v1alpha1 and serialize back.
@@ -156,6 +157,9 @@ func convertHTTPConfigFrom(in *v1alpha1.HTTPConfig) *HTTPConfig {
 }
 
 func convertKeyValuesFrom(in []v1alpha1.KeyValue) []KeyValue {
+	if in == nil {
+		return nil
+	}
 	out := make([]KeyValue, len(in))
 
 	for i := range in {
@@ -492,6 +496,7 @@ func convertPushoverConfigFrom(in v1alpha1.PushoverConfig) PushoverConfig {
 		Message:      in.Message,
 		URL:          in.URL,
 		URLTitle:     in.URLTitle,
+		TTL:          in.TTL,
 		Device:       in.Device,
 		Sound:        in.Sound,
 		Priority:     in.Priority,

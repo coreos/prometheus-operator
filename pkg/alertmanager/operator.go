@@ -69,7 +69,7 @@ const (
 )
 
 var (
-	ErrFieldNotAvailable = errors.New("fields_unavailable")
+	ErrFieldNotAvailable = errors.New("fields_not_available")
 )
 
 // Config defines the operator's parameters for the Alertmanager controller.

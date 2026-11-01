@@ -19,7 +19,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 )
@@ -35,9 +35,9 @@ func TestValidateGlobalTelegramConfig(t *testing.T) {
 			name: "Test validate global telegram config - botToken specified",
 			config: &monitoringv1.AlertmanagerGlobalConfig{
 				TelegramConfig: &monitoringv1.GlobalTelegramConfig{
-					BotToken: &v1.SecretKeySelector{
+					BotToken: &corev1.SecretKeySelector{
 						Key:                  "token",
-						LocalObjectReference: v1.LocalObjectReference{Name: "telegram"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "telegram"},
 					},
 				},
 			},
@@ -56,9 +56,9 @@ func TestValidateGlobalTelegramConfig(t *testing.T) {
 			name: "Test fail to validate global telegram config - botToken and botTokenFile specified",
 			config: &monitoringv1.AlertmanagerGlobalConfig{
 				TelegramConfig: &monitoringv1.GlobalTelegramConfig{
-					BotToken: &v1.SecretKeySelector{
+					BotToken: &corev1.SecretKeySelector{
 						Key:                  "token",
-						LocalObjectReference: v1.LocalObjectReference{Name: "telegram"},
+						LocalObjectReference: corev1.LocalObjectReference{Name: "telegram"},
 					},
 					BotTokenFile: new("/bot/token/file"),
 				},

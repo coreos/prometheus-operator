@@ -1,6 +1,13 @@
 ## UNRELEASED
 
+* [ENHANCEMENT] Add `--disable-pprof` CLI argument. #8920
 * [BUGFIX] Reject AlertmanagerConfig resources where PagerDuty `routingKey` and `serviceKey` references resolve to empty strings. #8842
+* [BUGFIX] Rollout Alertmanager pods when the cluster TLS configuration is updated. #8840
+
+## 0.94.2 / 2026-10-22
+
+* [SECURITY] Rebuild with latest `quay.io/prometheus/busybox` base images to remove the `Comodo AAA Services root` and `emSign ECC Root CA - G3` root CAs. #8907
+* [SECURITY] Rebuild with Go 1.27.3 to fix various vulnerabilities. #8907
 
 ## 0.94.1 / 2026-09-23
 

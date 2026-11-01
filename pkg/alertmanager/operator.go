@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+	"github.com/cespare/xxhash/v2"
 	"github.com/mitchellh/hashstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/model"
@@ -687,10 +688,10 @@ func (c *Operator) sync(ctx context.Context, key string) (func(context.Context) 
 		return closure, fmt.Errorf("failed to synchronize the web config secret: %w", err)
 	}
 
-	// TODO(simonpasquier): the operator should take into account changes to
-	// the cluster TLS configuration to trigger a rollout of the pods (this
-	// configuration doesn't support live reload).
-	if err := c.createOrUpdateClusterTLSConfigSecret(ctx, am); err != nil {
+	// A change to the cluster TLS configuration triggers a rollout of the pods
+	// (this configuration doesn't support live reload).
+	clusterTLSConfigHash, err := c.createOrUpdateClusterTLSConfigSecret(ctx, am)
+	if err != nil {
 		return closure, fmt.Errorf("failed to synchronize the cluster TLS config secret: %w", err)
 	}
 
@@ -722,12 +723,12 @@ func (c *Operator) sync(ctx context.Context, key string) (func(context.Context) 
 		return closure, nil
 	}
 
-	newSSetInputHash, err := createSSetInputHash(*am, c.config, tlsShardedSecret, existingStatefulSet.Spec)
+	newSSetInputHash, err := createSSetInputHash(*am, c.config, tlsShardedSecret, existingStatefulSet.Spec, clusterTLSConfigHash)
 	if err != nil {
 		return closure, err
 	}
 
-	sset, err := makeStatefulSet(logger, am, c.config, newSSetInputHash, tlsShardedSecret)
+	sset, err := makeStatefulSet(logger, am, c.config, newSSetInputHash, clusterTLSConfigHash, tlsShardedSecret)
 	if err != nil {
 		return closure, fmt.Errorf("failed to generate statefulset: %w", err)
 	}
@@ -892,7 +893,7 @@ func labelSelectorForStatefulSets() string {
 	)
 }
 
-func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *operator.ShardedSecret, s appsv1.StatefulSetSpec) (string, error) {
+func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *operator.ShardedSecret, s appsv1.StatefulSetSpec, clusterTLSConfigHash string) (string, error) {
 	var http2 *bool
 	if a.Spec.Web != nil && a.Spec.Web.HTTPConfig != nil {
 		http2 = a.Spec.Web.HTTPConfig.HTTP2
@@ -911,6 +912,7 @@ func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *opera
 		Config                  Config
 		StatefulSetSpec         appsv1.StatefulSetSpec
 		ShardedSecret           *operator.ShardedSecret
+		ClusterTLSConfigHash    string
 	}{
 		AlertmanagerLabels:      a.Labels,
 		AlertmanagerAnnotations: a.Annotations,
@@ -919,6 +921,7 @@ func createSSetInputHash(a monitoringv1.Alertmanager, c Config, tlsAssets *opera
 		Config:                  c,
 		StatefulSetSpec:         s,
 		ShardedSecret:           tlsAssets,
+		ClusterTLSConfigHash:    clusterTLSConfigHash,
 	},
 		nil,
 	)
@@ -1236,6 +1239,13 @@ func checkRoute(ctx context.Context, route *monitoringv1alpha1.Route, amVersion 
 		return fmt.Errorf(
 			`invalid syntax in route config for 'matchers' comparison based matching is supported in Alertmanager >= 0.22.0 only (matchers=%v) (receiver=%v)`,
 			route.Matchers, route.Receiver)
+	}
+
+	if len(route.Labels) > 0 && !amVersion.GTE(semver.MustParse("0.34.0")) {
+		return fmt.Errorf(
+			"'labels' config set in 'route' but supported in Alertmanager >= 0.34.0 only - current %s",
+			amVersion.String(),
+		)
 	}
 
 	childRoutes, err := route.ChildRoutes()
@@ -1641,6 +1651,21 @@ func checkWebexConfigs(
 			return err
 		}
 
+		// Alertmanager refuses a Webex receiver whose credentials are empty.
+		if config.HTTPConfig != nil {
+			if config.HTTPConfig.Authorization != nil {
+				if _, err := store.GetSecretKey(ctx, namespace, *config.HTTPConfig.Authorization.Credentials, validation.NotEmpty); err != nil {
+					return fmt.Errorf("httpConfig.authorization: %w", err)
+				}
+			}
+
+			if config.HTTPConfig.BearerTokenSecret != nil {
+				if _, err := store.GetSecretKey(ctx, namespace, *config.HTTPConfig.BearerTokenSecret, validation.NotEmpty); err != nil {
+					return fmt.Errorf("httpConfig.bearerTokenSecret: %w", err)
+				}
+			}
+		}
+
 		if err := configureHTTPConfigInStore(ctx, config.HTTPConfig, namespace, store); err != nil {
 			return err
 		}
@@ -1717,15 +1742,15 @@ func checkPushoverConfigs(
 	amVersion semver.Version,
 ) error {
 	checkSecret := func(secret *corev1.SecretKeySelector, name string) error {
-		if secret != nil {
-			s, err := store.GetSecretKey(ctx, namespace, *secret)
-			if err != nil {
-				return err
-			}
-			if s == "" {
-				return fmt.Errorf("%s secret is specified, but the value is an empty string", name)
-			}
+		if secret == nil {
+			return nil
 		}
+
+		_, err := store.GetSecretKey(ctx, namespace, *secret, validation.NotEmpty)
+		if err != nil {
+			return fmt.Errorf("'%s': %w", name, err)
+		}
+
 		return nil
 	}
 
@@ -1733,9 +1758,11 @@ func checkPushoverConfigs(
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
 			return err
 		}
+
 		if err := checkSecret(config.UserKey, "userKey"); err != nil {
 			return err
 		}
+
 		if err := checkSecret(config.Token, "token"); err != nil {
 			return err
 		}
@@ -1886,8 +1913,8 @@ func checkMSTeamsV2Configs(
 
 	for _, config := range configs {
 		if config.WebhookURL != nil {
-			if _, err := store.GetSecretKey(ctx, namespace, *config.WebhookURL); err != nil {
-				return err
+			if _, err := store.GetSecretKey(ctx, namespace, *config.WebhookURL, validation.NotEmpty); err != nil {
+				return fmt.Errorf("webhookURL: %w", err)
 			}
 		}
 
@@ -2080,15 +2107,15 @@ func (c *Operator) createOrUpdateWebConfigSecret(ctx context.Context, a *monitor
 	return nil
 }
 
-func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *monitoringv1.Alertmanager) error {
+func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *monitoringv1.Alertmanager) (string, error) {
 	clusterTLSConfig, err := clustertlsconfig.New(clusterTLSConfigDir, a)
 	if err != nil {
-		return fmt.Errorf("failed to initialize the configuration: %w", err)
+		return "", fmt.Errorf("failed to initialize the configuration: %w", err)
 	}
 
 	data, err := clusterTLSConfig.ClusterTLSConfiguration()
 	if err != nil {
-		return fmt.Errorf("failed to generate the configuration: %w", err)
+		return "", fmt.Errorf("failed to generate the configuration: %w", err)
 	}
 
 	s := &corev1.Secret{
@@ -2107,10 +2134,10 @@ func (c *Operator) createOrUpdateClusterTLSConfigSecret(ctx context.Context, a *
 	)
 
 	if err = k8s.CreateOrUpdateSecret(ctx, c.kclient.CoreV1().Secrets(a.Namespace), s); err != nil {
-		return fmt.Errorf("failed to reconcile secret: %w", err)
+		return "", fmt.Errorf("failed to reconcile secret: %w", err)
 	}
 
-	return nil
+	return fmt.Sprintf("%x", xxhash.Sum64(data)), nil
 }
 
 func (c *Operator) recordDeprecatedFields(key string, logger *slog.Logger, a *monitoringv1.Alertmanager) {

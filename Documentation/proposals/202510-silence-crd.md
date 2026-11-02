@@ -418,6 +418,20 @@ The version check is not part of the startup pre-flight. The operator manages th
 
 ## Alternatives
 
+### Per-namespace or sharded Secrets
+
+The current design writes one Secret per Alertmanager instance, holding all Silences that target it regardless of source namespace. At large namespace counts — OpenShift clusters routinely reach 10,000 namespaces — this ceiling becomes a real constraint: 1,000–2,500 entries fit in a 1 MiB Secret, so a cluster with many simultaneously active Silences across many namespaces could exhaust a single Secret.
+
+Two sharding approaches were considered:
+
+**Per-namespace Secret** (`prometheus-operator-silences-<am-name>-<silence-namespace>`): each source namespace gets its own Secret. The per-namespace entry count is naturally small. The sidecar would watch a directory and merge all files before reconciling — the reconcile loop does not care whether entries came from one file or ten. The problem is the Alertmanager StatefulSet pod spec: Kubernetes volumes are declared statically, so the operator would have to update the StatefulSet (causing a pod restart) each time a new Silence namespace appears. At 10,000 namespaces this is not practical with the volume-mount approach.
+
+**Index-based sharding** (`prometheus-operator-silences-<am-name>-0`, `-1`, ...): the operator fills shard 0 to a configurable threshold then spills to shard 1. The sidecar processes all shards in the mounted directory. Adding a new shard still requires a StatefulSet update and pod restart, though less frequently than per-namespace.
+
+Both approaches are compatible with the sidecar's file-watching design — the sidecar union-merges all files in its directory before each reconcile. They were not adopted for the initial implementation because the 1 MiB limit is unlikely to be reached in practice, and deferring sharding keeps the operator and sidecar simpler. The shard-aware path can be added without changing the sidecar's reconcile contract.
+
+The alternative to volume-mounting — having the sidecar watch Secrets via the Kubernetes API — removes the StatefulSet restart constraint entirely: the sidecar could list-watch any number of Secrets dynamically. This reintroduces RBAC on the Alertmanager service account (the volume-mount approach was chosen precisely to avoid it) but may be the right trade-off for deployments operating at that scale.
+
 ### Use `createdBy` as the correlation key
 
 Writing `<namespace>/<name>` into the Alertmanager `createdBy` field, so a silence returned by the API can be matched back to its custom resource, was suggested during review of the earlier proposal. It removes the need to persist anything in `.status`.

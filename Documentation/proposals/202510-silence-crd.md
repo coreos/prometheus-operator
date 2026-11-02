@@ -289,7 +289,7 @@ The sidecar exposes a Prometheus metrics endpoint. Key metrics:
 | `silence_sidecar_sync_errors_total`            | `reason="unauthorized\|unreachable\|rejected"` | Breakdown of Alertmanager API failures  |
 | `silence_sidecar_last_sync_timestamp_seconds`  | —                                   | Unix timestamp of the last successful reconcile    |
 
-`silence_sidecar_sync_errors_total` fulfils the auth-distinguishability goal: `reason="unauthorized"` covers `401`/`403` responses, `reason="unreachable"` covers connection failures, and `reason="rejected"` covers `400`/`422` responses where Alertmanager rejected the silence payload. Operators can alert on the `unauthorized` label independently of general connectivity failures.
+`silence_sidecar_sync_errors_total` fulfils the auth-classification goal: `reason="unauthorized"` covers `401`/`403` responses, `reason="unreachable"` covers connection failures, and `reason="rejected"` covers `400`/`422` responses where Alertmanager rejected the silence payload. Operators can alert on the `unauthorized` label independently of general connectivity failures.
 
 `silence_sidecar_last_sync_timestamp_seconds` is a staleness gauge: an alerting rule of the form `time() - silence_sidecar_last_sync_timestamp_seconds > 300` fires when the sidecar has not successfully converged within five minutes, covering the case where the sidecar is running but unable to reach Alertmanager.
 
@@ -334,13 +334,13 @@ This matches the convention already used by `AlertmanagerConfig` matchers.
 
 **Timing:** the API requires `startsAt` and `endsAt` as absolute RFC3339 timestamps; there is no `duration` at the API level. The operator computes `endsAt = startsAt + duration` before writing to the Secret, defaulting `startsAt` to the resource's creation timestamp. Because exactly one of `endsAt` or `duration` is always present, a concrete `endsAt` can always be computed and no synthetic far-future expiry is ever written.
 
-**`startsAt` normalisation.** When a silence is posted with a `startsAt` in the past — which is the common case for a Silence CR that was created before its start time elapsed — Alertmanager normalises `startsAt` to the current time. The value stored in Alertmanager will therefore differ from the `startsAt` written to the Secret. The sidecar's update-detection logic must not compare `startsAt`, or it will trigger a spurious update on every reconcile cycle. Only `endsAt`, matchers, `comment`, and `createdBy` are used to decide whether an update is needed.
+**`startsAt` normalization.** When a silence is posted with a `startsAt` in the past — which is the common case for a Silence CR that was created before its start time elapsed — Alertmanager normalizes `startsAt` to the current time. The value stored in Alertmanager will therefore differ from the `startsAt` written to the Secret. The sidecar's update-detection logic must not compare `startsAt`, or it will trigger a spurious update on every reconcile cycle. Only `endsAt`, matchers, `comment`, and `createdBy` are used to decide whether an update is needed.
 
 ### Namespace Isolation
 
 The existing `alertmanagerConfigMatcherStrategy` field controls whether a `namespace` matcher is injected into `AlertmanagerConfig` routes and inhibit rules. The Silence controller reads the **same field**, giving operators a single knob for namespace isolation across both config-based and silence-based resources.
 
-| Strategy value                                | Behaviour for Silence resources                                                                          |
+| Strategy value                                | Behavior for Silence resources                                                                           |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | `OnNamespace` (default)                       | Prepends `namespace=<resource namespace>` to matchers before Secret write                                |
 | `OnNamespaceExceptForAlertmanagerNamespace`   | Same, except Silences in the Alertmanager's own namespace receive no namespace matcher                   |
@@ -348,7 +348,7 @@ The existing `alertmanagerConfigMatcherStrategy` field controls whether a `names
 
 When injection applies, the operator prepends `namespace=<resource namespace>` before writing to the Secret: a Silence in namespace `frontend` with matcher `severity=critical` is written as `namespace="frontend" AND severity="critical"`. The sidecar posts the matchers verbatim; it applies no strategy logic of its own.
 
-The API documentation for the `alertmanagerConfigMatcherStrategy` field will need updating to cover the `OnNamespaceExceptForAlertmanagerNamespace` and `None` behaviours for Silence resources.
+The API documentation for the `alertmanagerConfigMatcherStrategy` field will need updating to cover the `OnNamespaceExceptForAlertmanagerNamespace` and `None` behaviors for Silence resources.
 
 **Matcher order is significant.** Alertmanager compares matchers as an ordered list, not a set, so the controller emits them in a stable order with the injected `namespace` matcher always in the same position. Reordering alone would be read as a matcher change and replace the silence with a new UUID.
 
@@ -445,7 +445,7 @@ It was not taken for the same reason as `createdBy`: the field is user-editable,
 
 ### Store the Alertmanager-assigned UUID in `.status`
 
-An earlier revision of this proposal stored the Alertmanager-assigned silence UUID in `.status.bindings[].silenceID`. This made the controller stateful in a way that adds operational surface: the UUID must survive operator restarts; status writes must be synchronised with the API calls that produce them; resource-version conflicts between other updates and a status write required care.
+An earlier revision of this proposal stored the Alertmanager-assigned silence UUID in `.status.bindings[].silenceID`. This made the controller stateful in a way that adds operational surface: the UUID must survive operator restarts; status writes must be synchronized with the API calls that produce them; resource-version conflicts between other updates and a status write required care.
 
 Annotation-based identity, using the support added in [alertmanager PR #4965](https://github.com/prometheus/alertmanager/pull/4965), resolves these issues. The sidecar discovers the UUID by querying Alertmanager directly — which is authoritative — rather than relying on a cached copy in Kubernetes. There is nothing to persist and nothing to go stale.
 

@@ -8278,8 +8278,14 @@
                     "properties": {
                       "corsOrigin": {
                         "description": "corsOrigin is a fully anchored regular expression matching the origins\nallowed to call the API from a browser. This corresponds to the\nAlertmanager's `--web.cors.origin` flag.\nIt requires Alertmanager >= v0.34.2.",
-                        "pattern": "^\\S+$",
-                        "type": "string"
+                        "minLength": 1,
+                        "type": "string",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "corsOrigin must be a valid regular expression",
+                            "rule": "''.matches('^(?:'+self+')$') || !''.matches('^(?:'+self+')$')"
+                          }
+                        ]
                       },
                       "getConcurrency": {
                         "description": "getConcurrency defines the maximum number of GET requests processed concurrently. This corresponds to the\nAlertmanager's `--web.get-concurrency` flag.",

@@ -43,7 +43,7 @@ Platform engineers and SREs operating Kubernetes clusters with prometheus-operat
 * Support multi-prometheus-operator deployments with per-operator silence scoping.
 * Provide namespace isolation via automatic matcher injection.
 * Track silence identity in a reliable fashion.
-* Confine credential handling to the Alertmanager resource, not individual Silences. Do not assume the Alertmanager API is unauthenticated. Auth failures (401/403) must be distinguishable from connectivity failures in sidecar metrics.
+* Keep credential handling at the Alertmanager level: credentials belong to the Alertmanager resource, not individual Silence CRs, and `401`/`403` responses from the sidecar must be surfaced as a distinct metric from connectivity failures.
 
 ## Non-Goals
 
@@ -182,7 +182,7 @@ A dedicated `SilenceReconciler`, separate from the existing Alertmanager control
 
 1. Watches Silence and Alertmanager custom resources.
 2. On Silence change: resolves target Alertmanager resources via `silenceSelector` / `silenceNamespaceSelector`.
-3. For each target Alertmanager resource: reads the existing Secret (if any), updates the silence entry for this Silence CR (keyed by its UID), applies namespace matcher injection (see [Namespace Isolation](#namespace-isolation)), and writes the Secret back.
+3. For each target Alertmanager resource: rebuilds `silences.json` in full from the informer cache — all active, non-expired Silences that select this Alertmanager, with namespace matchers injected (see [Namespace Isolation](#namespace-isolation)) and timing resolved to absolute RFC3339 — and writes it as the Secret. A full rebuild per reconcile avoids the read-modify-write race when two Silence CRs targeting the same Alertmanager are reconciled concurrently.
 4. On Silence deletion: removes the silence's entry from each Alertmanager's Secret. The sidecar's next reconcile detects the orphan and deletes it from Alertmanager. No finalizer is required.
 5. Periodic reconcile on the informer resync, correcting any Secret divergence.
 

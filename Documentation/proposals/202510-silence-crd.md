@@ -244,6 +244,60 @@ Retryable failures are requeued with the workqueue's exponential backoff. The re
 
 **Sidecar (Alertmanager API) failures** are reported through sidecar metrics rather than Silence status conditions. See [Observability](#observability).
 
+### silence-sidecar
+
+The `silence-sidecar` is a dedicated binary, one instance per Alertmanager pod, analogous to the existing `config-reloader`. It owns the entire Alertmanager API interaction: the operator writes desired state to a Secret; the sidecar reads it and converges the live Alertmanager instance.
+
+#### Deployment
+
+When the `SilenceCRD` feature gate is enabled, the operator injects the `silence-sidecar` container and its associated volume into the Alertmanager StatefulSet template — the same mechanism used by `config-reloader`. Specifically:
+
+* A `silence-config` volume of type `Secret` is added, backed by the `prometheus-operator-silences-<am-name>` Secret.
+* The volume is mounted at `/etc/alertmanager/silences` inside the `silence-sidecar` container.
+* The container is added alongside the existing `alertmanager` and `config-reloader` containers.
+
+No changes to existing containers are required.
+
+#### Configuration
+
+| Flag                 | Default                                          | Description                              |
+|----------------------|--------------------------------------------------|------------------------------------------|
+| `--silence-file`     | `/etc/alertmanager/silences/silences.json`       | Path to the mounted silences JSON file   |
+| `--alertmanager-url` | `http://localhost:9093`                          | Local Alertmanager API endpoint          |
+| `--web.listen-address` | `:9097`                                        | Address to expose the metrics endpoint   |
+
+#### Reconcile loop
+
+The sidecar reconciles on two triggers: process start, and whenever the mounted `silences.json` file changes (via filesystem watch; polling every 30 seconds as a fallback). Each reconcile cycle:
+
+1. Read and unmarshal `silences.json` from the mounted path. If the file is absent or empty, treat it as an empty list (all operator-managed silences should be deleted).
+2. List all Alertmanager silences carrying the `monitoring.coreos.com/silence-uid` annotation.
+3. For each entry in the file: look up the Alertmanager silence by annotation UID.
+   - If **absent**: create a new silence, setting the annotation to the entry's `uid`.
+   - If **present but different**: update the silence.
+   - If **matching**: no write.
+4. **Orphan pass**: delete any Alertmanager silence whose `monitoring.coreos.com/silence-uid` annotation does not appear in the file. This handles Silence CR deletion without requiring a finalizer on the Kubernetes resource.
+
+The sidecar never writes back to the Secret. It is a consumer, not a co-owner.
+
+#### Observability
+
+The sidecar exposes a Prometheus metrics endpoint. Key metrics:
+
+| Metric                                         | Labels                              | Description                                        |
+|------------------------------------------------|-------------------------------------|----------------------------------------------------|
+| `silence_sidecar_reconcile_total`              | `result="success\|error"`           | Total reconcile attempts and their outcome         |
+| `silence_sidecar_sync_errors_total`            | `reason="unauthorized\|unreachable\|rejected"` | Breakdown of Alertmanager API failures  |
+| `silence_sidecar_last_sync_timestamp_seconds`  | —                                   | Unix timestamp of the last successful reconcile    |
+
+`silence_sidecar_sync_errors_total` fulfils the auth-distinguishability goal: `reason="unauthorized"` covers `401`/`403` responses, `reason="unreachable"` covers connection failures, and `reason="rejected"` covers `400`/`422` responses where Alertmanager rejected the silence payload. Operators can alert on the `unauthorized` label independently of general connectivity failures.
+
+`silence_sidecar_last_sync_timestamp_seconds` is a staleness gauge: an alerting rule of the form `time() - silence_sidecar_last_sync_timestamp_seconds > 300` fires when the sidecar has not successfully converged within five minutes, covering the case where the sidecar is running but unable to reach Alertmanager.
+
+#### Shipping
+
+The `silence-sidecar` is delivered as a separate binary within the prometheus-operator release, following the same packaging model as `config-reloader`. Whether it ships in the same container image or a dedicated one is an implementation decision made when the binary is introduced; the StatefulSet injection logic in the operator must be updated to reference whichever image is chosen.
+
 ### Drift Detection
 
 Silence identity in Alertmanager is tracked via annotations, using the annotation support added in [alertmanager PR #4965](https://github.com/prometheus/alertmanager/pull/4965). This requires **Alertmanager >= 0.32.0**.

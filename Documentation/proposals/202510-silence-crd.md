@@ -419,7 +419,7 @@ The version check is not part of the startup pre-flight. The operator manages th
 
 ### Per-namespace or sharded Secrets
 
-The current design writes one Secret per Alertmanager instance, holding all Silences that target it regardless of source namespace. At large namespace counts — OpenShift clusters routinely reach 10,000 namespaces — this ceiling becomes a real constraint: 1,000–2,500 entries fit in a 1 MiB Secret, so a cluster with many simultaneously active Silences across many namespaces could exhaust a single Secret.
+The current design writes one Secret per Alertmanager instance, holding all Silences that target it regardless of source namespace. At large namespace counts — OpenShift supports up to 10,000 namespaces — this ceiling can become a constraint: 1,000–2,500 entries fit in a 1 MiB Secret, so a cluster with many simultaneously active Silences across many namespaces could exhaust a single Secret.
 
 Two sharding approaches were considered:
 

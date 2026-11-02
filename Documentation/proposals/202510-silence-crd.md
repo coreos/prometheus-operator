@@ -325,7 +325,7 @@ The operator's access to Alertmanager is mediated by the Secret, not by a direct
 
 **Auth failures must be distinguishable from connectivity failures.** The sidecar must classify Alertmanager API responses: a `401` or `403` is a credential problem and must be exposed as a distinct counter or metric label (e.g. `reason="unauthorized"`) so operators can tell it apart from a connectivity failure (`reason="unreachable"`). A refused request is not an outage.
 
-Kubernetes RBAC for the sidecar to read the silence Secret is handled by the operator: when the `SilenceCRD` gate is enabled, the operator adds `get` and `watch` on the silence Secret to the existing Alertmanager service account's ClusterRole. No user action is required.
+**The sidecar's Kubernetes RBAC is the user's responsibility.** The sidecar needs at minimum `get` on the silence Secret. To enable immediate reconciliation on Secret change rather than waiting for the next poll interval, `watch` is also required. Granting these permissions to the Alertmanager service account is the responsibility of the user deploying Alertmanager — the operator injects the sidecar container but does not take ownership of the Alertmanager SA's permissions, as doing so would require managing the Alertmanager deployment more invasively than is appropriate.
 
 The operator's own RBAC to read and write the silence Secret in each Alertmanager's namespace is shown in [Feature Gate](#feature-gate).
 

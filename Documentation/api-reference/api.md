@@ -7965,6 +7965,21 @@ uint32
 <code>--web.timeout</code> flag.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>corsOrigin</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>corsOrigin is a fully anchored regular expression matching the origins
+allowed to call the API from a browser. This corresponds to the
+Alertmanager&rsquo;s <code>--web.cors.origin</code> flag.
+It requires Alertmanager &gt;= v0.34.2.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="monitoring.coreos.com/v1.ArbitraryFSAccessThroughSMsConfig">ArbitraryFSAccessThroughSMsConfig

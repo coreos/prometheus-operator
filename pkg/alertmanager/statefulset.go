@@ -329,6 +329,10 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 		amArgs = append(amArgs, monitoringv1.Argument{Name: "web.timeout", Value: fmt.Sprintf("%d", *web.Timeout)})
 	}
 
+	if version.GTE(semver.MustParse("0.34.2")) && web != nil && web.CORSOrigin != nil {
+		amArgs = append(amArgs, monitoringv1.Argument{Name: "web.cors.origin", Value: *web.CORSOrigin})
+	}
+
 	limits := a.Spec.Limits
 	if version.GTE(semver.MustParse("0.28.0")) && limits != nil {
 		if limits.MaxSilences != nil {

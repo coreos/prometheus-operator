@@ -8276,6 +8276,11 @@
                   "web": {
                     "description": "web defines the web command line flags when starting Alertmanager.",
                     "properties": {
+                      "corsOrigin": {
+                        "description": "corsOrigin is a fully anchored regular expression matching the origins\nallowed to call the API from a browser. This corresponds to the\nAlertmanager's `--web.cors.origin` flag.\nIt requires Alertmanager >= v0.34.2.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
                       "getConcurrency": {
                         "description": "getConcurrency defines the maximum number of GET requests processed concurrently. This corresponds to the\nAlertmanager's `--web.get-concurrency` flag.",
                         "format": "int32",

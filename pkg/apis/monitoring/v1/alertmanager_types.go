@@ -642,6 +642,14 @@ type AlertmanagerWebSpec struct {
 	// +kubebuilder:validation:Minimum:=0
 	// +optional
 	Timeout *uint32 `json:"timeout,omitempty"`
+	// corsOrigin is a fully anchored regular expression matching the origins
+	// allowed to call the API from a browser. This corresponds to the
+	// Alertmanager's `--web.cors.origin` flag.
+	// It requires Alertmanager >= v0.34.2.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +optional
+	CORSOrigin *string `json:"corsOrigin,omitempty"`
 }
 
 // AlertmanagerLimitsSpec defines the limits command line flags when starting Alertmanager.

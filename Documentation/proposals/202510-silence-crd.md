@@ -42,7 +42,7 @@ Platform engineers and SREs operating Kubernetes clusters with prometheus-operat
 * Support deployments with multiple Alertmanager resources, reporting status separately for each resource that selects a Silence.
 * Support multi-prometheus-operator deployments with per-operator silence scoping.
 * Provide namespace isolation via automatic matcher injection.
-* Track silence identity using the Alertmanager-assigned UUID, not a user-settable field.
+* Track silence identity in a reliable fashion.
 * Confine credential handling to a single integration point, and report a refused request as an authentication failure rather than an outage. Do not assume the Alertmanager API is unauthenticated.
 
 ## Non-Goals
@@ -84,11 +84,11 @@ status:
       resource: alertmanagers
       name: main
       namespace: monitoring
-      silenceID: "abc123-def456-..."
+      lastSyncTime: "2024-01-15T10:01:00Z"
       conditions:
         - type: Accepted
           status: "True"
-          reason: SilenceApplied
+          reason: SecretWritten
           lastTransitionTime: "2024-01-15T10:01:00Z"
           observedGeneration: 1
 ```
@@ -115,26 +115,22 @@ CEL validation: exactly one of `endsAt` or `duration` must be set; when both `st
 
 `duration` reuses `monitoringv1.NonEmptyDuration`, already used by `AlertmanagerConfig` for `groupWait`, `groupInterval` and `repeatInterval` and parsed by Prometheus' `model.ParseDuration`. `NonEmptyDuration` rather than `Duration`, because the field is an optional pointer and `Duration` permits the empty string.
 
-**`comment` and `createdBy` are passed through verbatim**, as Alertmanager requires both on every write. `comment` is required on the custom resource — a silence should always carry a reason — and `createdBy` defaults to `prometheus-operator`. Neither plays any role in identity tracking, which is what allows `createdBy` to be user-settable: identity is anchored solely to the UUID in `.status.bindings[].silenceID`, so editing either field in the Alertmanager UI cannot detach a silence from its resource. Using `createdBy` as the correlation key is discussed under [Alternatives](#alternatives).
+**`comment` and `createdBy` are passed through verbatim**, as Alertmanager requires both on every write. `comment` is required on the custom resource — a silence should always carry a reason — and `createdBy` defaults to `prometheus-operator`. Neither plays any role in identity tracking: identity is anchored to the Silence resource's UID, stored as an Alertmanager silence annotation (see [Drift Detection](#drift-detection)).
 
-**Status fields.** `.status` reuses the convention from the [status subresource for config-based resources](accepted/202501-configuration-object-status-subresource.md) proposal — `ConfigResourceStatus` / `WorkloadBinding` / `ConfigResourceCondition`, as implemented for `ServiceMonitor`, `PodMonitor`, `Probe`, `PrometheusRule`, `ScrapeConfig` and `AlertmanagerConfig`. `.status.bindings[]` lists the Alertmanager resources that selected this Silence, each with its own conditions:
+**Status fields.** `.status` reuses the convention from the [status subresource for config-based resources](accepted/202501-configuration-object-status-subresource.md) proposal — `ConfigResourceStatus` / `WorkloadBinding` / `ConfigResourceCondition`, as implemented for `ServiceMonitor`, `PodMonitor`, `Probe`, `PrometheusRule`, `ScrapeConfig` and `AlertmanagerConfig`. `.status.bindings[]` lists the Alertmanager resources for which the operator has written silence state:
 
-| Field        | Description                                                        |
-|--------------|--------------------------------------------------------------------|
-| `group`      | API group of the bound workload resource (`monitoring.coreos.com`) |
-| `resource`   | Resource type of the bound workload (`alertmanagers`)              |
-| `name`       | Name of the Alertmanager resource                                  |
-| `namespace`  | Namespace of the Alertmanager resource                             |
-| `silenceID`  | Alertmanager-assigned UUID for this binding (see below)            |
-| `conditions` | Per-binding conditions, including `observedGeneration`             |
+| Field          | Description                                                        |
+|----------------|--------------------------------------------------------------------|
+| `group`        | API group of the bound workload resource (`monitoring.coreos.com`) |
+| `resource`     | Resource type of the bound workload (`alertmanagers`)              |
+| `name`         | Name of the Alertmanager resource                                  |
+| `namespace`    | Namespace of the Alertmanager resource                             |
+| `lastSyncTime` | When the operator last successfully wrote the Secret for this AM   |
+| `conditions`   | Per-binding conditions, including `observedGeneration`             |
 
 There is no top-level `conditions` or `observedGeneration`: a Silence may be selected by several Alertmanager resources and its state can legitimately differ between them, so both belong at the binding level.
 
-**`silenceID` is the one addition to the standard binding shape**, and it is load-bearing. The silence API is not declarative: creation returns a server-assigned UUID, and every later update or delete must address it by that UUID. Unlike other configuration resources, whose desired state is re-rendered into a configuration file on each reconcile, the controller cannot re-derive that handle — without persisting it, an operator restart orphans every silence it created and the next reconcile duplicates them. Correlating through `createdBy` or `comment` instead is examined under [Alternatives](#alternatives).
-
-Deliberately **not** included, to keep the binding to the minimum useful at `v1alpha1`: per-replica sync counters. See [Clustered Alertmanager](#clustered-alertmanager).
-
-**Condition type.** `ConfigResourceCondition` constrains `type` to `Accepted`. Its documented meaning is phrased in terms of writing the configuration secret; Silence would be the first configuration resource applied by a REST call to a running Alertmanager instead, so the meaning carries over but the wording may want widening.
+Unlike other configuration resources whose handlers can report the outcome of each write synchronously, the Silence controller writes desired state to a Secret and delegates the actual Alertmanager API calls to a sidecar (see [Controller](#controller)). The binding condition therefore reflects whether the operator succeeded in writing the Secret — the sidecar's convergence is observable through its own instrumentation.
 
 ### Alertmanager CRD Extensions
 
@@ -163,75 +159,119 @@ This is the convention already used by `alertmanagerConfigSelector` / `alertmana
 
 ### Controller
 
+The controller follows the **Secret-backed sidecar** pattern used by the existing config-reloader:
+
+```
+SilenceReconciler (operator)
+  watches Silence CRs and Alertmanager CRs
+  for each Alertmanager instance that selects a Silence:
+    writes/updates a Secret in the Alertmanager's namespace
+
+Secret  (one per Alertmanager instance)
+  name: prometheus-operator-silences-<alertmanager-name>
+  key:  silences.json
+
+silence-sidecar  (one per Alertmanager pod, like config-reloader)
+  watches the Secret
+  calls local Alertmanager v2 API to create, update, or delete silences
+  uses the Silence CR UID stored in an Alertmanager annotation to track identity
+  orphan pass: deletes any Alertmanager silence whose annotation UID is absent from the Secret
+```
+
 A dedicated `SilenceReconciler`, separate from the existing Alertmanager controller:
 
 1. Watches Silence and Alertmanager custom resources.
-2. Resolves target Alertmanager resources via `silenceSelector` / `silenceNamespaceSelector`.
-3. For each target Alertmanager resource:
-   - Looks up the existing silence by `.status.bindings[].silenceID` if present.
-   - Creates or updates the silence via Alertmanager REST API v2.
-   - Writes the returned UUID to `.status.bindings[]` — which is not always the UUID sent, see [Drift Detection](#drift-detection).
-4. On deletion: removes the finalizer (`monitoring.coreos.com/silence-cleanup`) after deleting the silence from every bound Alertmanager resource by `silenceID`. A 404 (e.g. silence already GC'd after retention) is treated as success so the finalizer is never stuck.
-5. Periodic reconcile on the informer resync, correcting any divergence (see [Drift Detection](#drift-detection)).
+2. On Silence change: resolves target Alertmanager resources via `silenceSelector` / `silenceNamespaceSelector`.
+3. For each target Alertmanager resource: reads the existing Secret (if any), updates the silence entry for this Silence CR (keyed by its UID), applies namespace matcher injection (see [Namespace Isolation](#namespace-isolation)), and writes the Secret back.
+4. On Silence deletion: removes the silence's entry from each Alertmanager's Secret. The sidecar's next reconcile detects the orphan and deletes it from Alertmanager. No finalizer is required.
+5. Periodic reconcile on the informer resync, correcting any Secret divergence.
 
-Alertmanager silence expiry is two-phased: once `endsAt` passes the silence enters `expired` state but remains accessible via the API; once `endsAt + spec.retention` passes (default 120h) it is purged and subsequent GET/DELETE return 404.
+No finalizer is needed on the Silence resource. When the Silence CR is deleted, the operator removes its entry from each Secret; when the Alertmanager CR changes or is deleted, the operator reconciles or removes the Secret accordingly. Cleanup of the actual Alertmanager API silence is delegated to the sidecar.
 
-When the effective `endsAt` is in the past — computed locally, without an API call — the controller sets `Accepted=False` with `reason: SilenceExpired` on each binding and stops reconciling. The resource persists until explicitly deleted; automatic cleanup is a [non-goal](#non-goals). Updating `spec.endsAt` or `spec.duration` to a future time re-activates it: the next reconcile clears the condition and creates a new silence.
+When the effective `endsAt` is in the past — computed locally, without an API call — the controller sets `Accepted=False` with `reason: SilenceExpired` on each binding and stops writing to the Secret. The resource persists until explicitly deleted; automatic cleanup is a [non-goal](#non-goals). Updating `spec.endsAt` or `spec.duration` to a future time re-activates it: the next reconcile clears the condition and writes the Secret again.
+
+#### Secret Format
+
+The Secret holds a JSON document under the key `silences.json`:
+
+```json
+{
+  "silences": [
+    {
+      "uid": "<Silence CR UID>",
+      "name": "<Silence CR name>",
+      "namespace": "<Silence CR namespace>",
+      "matchers": [
+        {"name": "namespace", "value": "frontend", "matchType": "="},
+        {"name": "alertname", "value": "HighLatency", "matchType": "="}
+      ],
+      "startsAt":   "2024-01-15T10:00:00Z",
+      "endsAt":     "2024-01-15T14:00:00Z",
+      "comment":    "CHANGE-12345",
+      "createdBy":  "platform-team"
+    }
+  ]
+}
+```
+
+Namespace matchers are pre-injected into `matchers` by the operator before writing; the sidecar posts the matchers verbatim without applying any injection logic. Timing fields are resolved to absolute RFC3339 timestamps (see [Alertmanager API Translation](#alertmanager-api-translation)) before the Secret is written.
+
+The operator owns the Secret. The sidecar reads it but never writes back to it.
 
 #### Observability
 
-The controller registers no metrics of its own. Wrapping its registerer with `controller="silence"`, as the Prometheus, Alertmanager and ThanosRuler controllers already do, gives it the set the operator exports for every controller: `prometheus_operator_reconcile_operations_total`, `prometheus_operator_reconcile_errors_total`, `prometheus_operator_reconcile_duration_seconds`, `prometheus_operator_syncs` by status, and the full workqueue family. Alerting on failed silence reconciliation — the operational need raised when this feature was first requested — is then `prometheus_operator_reconcile_errors_total{controller="silence"}`.
+The `SilenceReconciler` registers no metrics of its own beyond those the operator already exports for every controller via `controller="silence"`: `prometheus_operator_reconcile_operations_total`, `prometheus_operator_reconcile_errors_total`, `prometheus_operator_reconcile_duration_seconds`, and the full workqueue family. Alerting on Secret-write failures is then `prometheus_operator_reconcile_errors_total{controller="silence"}`.
+
+The sidecar requires its own instrumentation to detect convergence failures. The operator writes only to the Kubernetes API and has no visibility into whether the sidecar has successfully applied the Secret to Alertmanager, so sidecar health must be observable independently: metrics exposed by the sidecar and alerting rules that fire when it cannot converge. Sidecar metrics and alerting rules are defined as part of the sidecar implementation task.
 
 #### Failure handling
 
-Writes to the Alertmanager API differ in one respect that matters operationally: whether trying again can succeed. Retrying everything means hammering a rejected credential forever; retrying nothing means a routine restart permanently breaks silences that would have healed in seconds.
+The operator's write path reaches only the Kubernetes API (to read and write the Secret). The sidecar handles all Alertmanager API interactions.
 
-| Situation                                               | `reason`                     | Retry               |
-|---------------------------------------------------------|------------------------------|---------------------|
-| Silence written successfully                            | `SilenceApplied`             | — (`Accepted=True`) |
-| Alertmanager unreachable, restarting, or returning 5xx  | `AlertmanagerUnreachable`    | backoff             |
-| `spec.listenLocal` leaves no reachable address          | `AlertmanagerNotAddressable` | none                |
-| 401 or 403, from Alertmanager or a proxy in front of it | `AlertmanagerUnauthorized`   | none                |
-| 400 — Alertmanager rejected the silence                 | `SilenceRejected`            | none                |
-| Effective `endsAt` already passed                       | `SilenceExpired`             | none                |
+**Operator (Secret write) failures:**
 
-Retryable failures are requeued with the workqueue's exponential backoff. The rest are not: the fix is a change to the Silence or the Alertmanager resource, not the passage of time. They are still re-attempted on the ordinary resync and whenever either resource changes, so a corrected configuration recovers without the controller tracking what it gave up on.
+| Situation                                           | `reason`                     | Retry               |
+|-----------------------------------------------------|------------------------------|---------------------|
+| Secret written successfully                         | `SecretWritten`              | — (`Accepted=True`) |
+| Kubernetes API unreachable or returning 5xx         | `SecretWriteFailed`          | backoff             |
+| RBAC denies the operator write access to the Secret | `SecretWriteDenied`          | none                |
+| `spec.listenLocal` leaves no reachable address      | `AlertmanagerNotAddressable` | none                |
+| Effective `endsAt` already passed                   | `SilenceExpired`             | none                |
 
-Classification is by status code, not type assertion: the generated client returns typed responses for `400` and `404`, but `401`, `403` and connection failures all arrive through the reader's default branch as untyped errors carrying the HTTP status. `AlertmanagerUnauthorized` is listed even though authentication is deferred to [#5836](https://github.com/prometheus-operator/prometheus-operator/issues/5836), because an Alertmanager behind a proxy requiring credentials is reachable, answers, and refuses — which needs to read as a credentials problem rather than an outage.
+Retryable failures are requeued with the workqueue's exponential backoff. The rest are not: the fix is a change to the Silence or the Alertmanager resource. They are still re-attempted on the ordinary resync and whenever either resource changes, so a corrected configuration recovers without the controller tracking what it gave up on.
+
+**Sidecar (Alertmanager API) failures** are reported through sidecar metrics rather than Silence status conditions. See [Observability](#observability).
 
 ### Drift Detection
 
-A silence can diverge from its resource while the controller is not looking: someone edits or expires it in the UI, or the Alertmanager loses it entirely — purged after retention, or restarted without persistent storage.
+Silence identity in Alertmanager is tracked via annotations, using the annotation support added in [alertmanager PR #4965](https://github.com/prometheus/alertmanager/pull/4965). This requires **Alertmanager >= 0.32.0**.
 
-Drift detection is not a separate mechanism. The informer resync re-enqueues every Silence on a timer (5 minutes, matching the Alertmanager controller) and the ordinary reconcile path corrects what it finds. For each binding:
+When the sidecar creates or updates a silence it sets:
 
-1. Fetch the silence by `.status.bindings[].silenceID`.
-2. If **missing (404)**, create a new silence — posting with no ID — and record the returned UUID. The old UUID cannot be reused: a POST carrying an ID Alertmanager does not know is rejected with 404 rather than treated as a create. This covers both retention purges and an Alertmanager restarted without storage.
-3. If **present but different**, re-post it with the same ID, and record the UUID the response carries — which is not always the one sent. An expired silence reaches the controller through this branch, not as a 404: expiry leaves it readable until it is purged.
-4. If it **matches**, nothing is sent.
+```
+monitoring.coreos.com/silence-uid: <Silence CR UID>
+```
 
-**Re-posting with the same ID does not always preserve it.** Alertmanager keeps the UUID only where the change cannot alter the historic view of silencing; otherwise it expires the existing silence and stores the replacement under a fresh UUID, leaving the original visible as history:
+On each reconcile cycle the sidecar:
 
-| Drift                               | Outcome                             |
-|-------------------------------------|-------------------------------------|
-| `comment` or `createdBy` edited     | updated in place, UUID preserved    |
-| `endsAt` changed, silence active    | updated in place, UUID preserved    |
-| `startsAt` changed, silence pending | updated in place, UUID preserved    |
-| matchers edited                     | original expired, **new UUID**      |
-| silence expired early in the UI     | original left expired, **new UUID** |
+1. Lists all Alertmanager silences carrying the `monitoring.coreos.com/silence-uid` annotation.
+2. For each entry in the Secret: looks up the Alertmanager silence by UID annotation.
+   - If **missing**: creates a new silence and sets the annotation.
+   - If **present but different**: updates the silence.
+   - If **matching**: no write.
+3. **Orphan pass**: deletes any Alertmanager silence whose annotation UID does not appear in the Secret — this handles the case where a Silence CR was deleted or its Alertmanager was de-selected.
 
-This has been Alertmanager's behaviour since [#796](https://github.com/prometheus/alertmanager/pull/796) (2017), so the controller is written for it rather than around it: **the UUID recorded in `.status.bindings[].silenceID` is always the one the POST returned, never the one it sent.** Correction then converges in a single pass whether or not the ID survived, and a binding never points at a silence Alertmanager has retired. Treating the sent ID as authoritative would do the opposite — the binding would track an expired silence, and every later resync would mint another replacement.
+**The sidecar only touches silences it created.** Silences without the `monitoring.coreos.com/silence-uid` annotation — created through the UI, `amtool`, or any other client — are never examined, modified or deleted. Declarative management and ad-hoc silences coexist on the same Alertmanager without interference.
 
-Only the fields the controller sets are compared: matchers (after namespace injection), `endsAt`, `comment` and `createdBy`. Server-owned fields — `status`, `updatedAt` — are ignored, since comparing them would report drift on every pass and produce a write loop. Two further comparisons need care, because the obvious form of each is itself a write loop:
+Users who tamper with the annotation are on their own: removing it causes the sidecar to treat the silence as unmanaged and create a duplicate on the next reconcile; setting it to a foreign UID causes the sidecar to overwrite an unrelated silence.
 
-* **`startsAt` is compared only while the silence is pending.** Alertmanager clamps a `startsAt` in the past to the moment it accepted the silence, and thereafter refuses to change `startsAt` on an active silence at all. As `startsAt` defaults to the resource's creation timestamp, the stored and declared values differ for almost every silence once it is active — so comparing them would report drift on every pass, and each correction would replace the silence and allocate a new UUID. Once a silence is active its start time is settled, and the controller stops comparing it.
-* **Matcher order is significant.** Alertmanager compares matchers as an ordered list, not a set, so the controller emits them in a stable order with the injected `namespace` matcher always in the same position. Reordering alone would be read as a matcher change and replace the silence.
+**UUID replacement on matcher edits.** Alertmanager keeps the silence UUID only where the change cannot alter the historic view of silencing; otherwise it expires the existing silence and stores the replacement under a fresh UUID. The annotation-based approach handles this naturally: each POST includes the annotation in the request body, so the replacement silence carries the same annotation UID. The original expired silence also retains its annotation. The sidecar's list pass finds the active silence (by annotation) and reconciles against it; the expired one is left as history.
 
-**The controller only touches silences it created.** Reconciliation is driven from Silence resources outward: it looks up the UUIDs recorded in its own status and never lists the Alertmanager's silences to decide what to act on. A silence created through the UI, `amtool` or any other client has no binding and is never examined, modified or deleted. Declarative management and ad-hoc silences therefore coexist on the same Alertmanager — which matters, because ad-hoc silencing during an incident is the workflow this feature is least likely to replace. Reaping unmanaged silences is a [non-goal](#non-goals).
+Alertmanager silence expiry is two-phased: once `endsAt` passes the silence enters `expired` state but remains accessible via the API; once `endsAt + spec.retention` passes (default 120h) it is purged. An expired silence reached by the list pass is treated the same as a missing one — the sidecar creates a new silence — provided the Silence CR itself has not also expired (which the operator checks before writing to the Secret).
 
 ### Alertmanager API Translation
 
-The Alertmanager v2 API differs from the CRD spec in two ways the controller must bridge:
+The Alertmanager v2 API differs from the CRD spec in two ways the sidecar must bridge:
 
 **Matchers:** the API uses `isRegex` (required bool) and `isEqual` (optional bool, default `true`) rather than a `matchType` string:
 
@@ -244,25 +284,23 @@ The Alertmanager v2 API differs from the CRD spec in two ways the controller mus
 
 This matches the convention already used by `AlertmanagerConfig` matchers.
 
-**Timing:** the API requires `startsAt` and `endsAt` as absolute RFC3339 timestamps; there is no `duration` at the API level. The controller computes `endsAt = startsAt + duration` before posting, defaulting `startsAt` to the resource's creation timestamp. Because exactly one of `endsAt` or `duration` is always present, a concrete `endsAt` can always be computed and no synthetic far-future expiry is ever posted.
-
-#### Controller scoping (`--controller-id`)
-
-When `--controller-id` is set, the operator only processes resources whose `operator.prometheus.io/controller-id` annotation matches. Silence resources must carry it to be picked up:
-
-```yaml
-metadata:
-  annotations:
-    operator.prometheus.io/controller-id: <namespace>/<operator-name>
-```
-
-This matters in multi-operator environments — OpenShift, for example, where a platform operator and a user-workload operator may both be running — so that each acts only on the Silences assigned to it. Resources without the annotation are silently ignored.
+**Timing:** the API requires `startsAt` and `endsAt` as absolute RFC3339 timestamps; there is no `duration` at the API level. The operator computes `endsAt = startsAt + duration` before writing to the Secret, defaulting `startsAt` to the resource's creation timestamp. Because exactly one of `endsAt` or `duration` is always present, a concrete `endsAt` can always be computed and no synthetic far-future expiry is ever written.
 
 ### Namespace Isolation
 
 The existing `alertmanagerConfigMatcherStrategy` field controls whether a `namespace` matcher is injected into `AlertmanagerConfig` routes and inhibit rules. The Silence controller reads the **same field**, giving operators a single knob for namespace isolation across both config-based and silence-based resources.
 
-When the strategy is `OnNamespace` (the default), the controller prepends `namespace=<resource namespace>` to the matchers before posting: a Silence in namespace `frontend` with matcher `severity=critical` is posted as `namespace="frontend" AND severity="critical"`. The existing enforcer operates on the generated configuration file and cannot be shared, so this is implemented independently on the API call path.
+| Strategy value                                | Behaviour for Silence resources                                                                          |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| `OnNamespace` (default)                       | Prepends `namespace=<resource namespace>` to matchers before Secret write                                |
+| `OnNamespaceExceptForAlertmanagerNamespace`   | Same, except Silences in the Alertmanager's own namespace receive no namespace matcher                   |
+| `None`                                        | No namespace matcher is injected                                                                         |
+
+When injection applies, the operator prepends `namespace=<resource namespace>` before writing to the Secret: a Silence in namespace `frontend` with matcher `severity=critical` is written as `namespace="frontend" AND severity="critical"`. The sidecar posts the matchers verbatim; it applies no strategy logic of its own.
+
+The API documentation for the `alertmanagerConfigMatcherStrategy` field will need updating to cover the `OnNamespaceExceptForAlertmanagerNamespace` and `None` behaviours for Silence resources.
+
+**Matcher order is significant.** Alertmanager compares matchers as an ordered list, not a set, so the controller emits them in a stable order with the injected `namespace` matcher always in the same position. Reordering alone would be read as a matcher change and replace the silence with a new UUID.
 
 #### Namespace selection
 
@@ -277,44 +315,19 @@ if sel == nil {
 
 so Silence inherits the operator-wide semantics rather than reimplementing them. This requires a namespace informer and `get`, `list` and `watch` on `namespaces`, matching the RBAC the operator already needs for `AlertmanagerConfig` and ServiceMonitor namespace selection.
 
-### Alertmanager API Endpoint
-
-The controller reaches Alertmanager over the cluster-internal network only. It never uses `spec.externalUrl`: that describes access from outside the cluster, may be unresolvable from the operator, may terminate at a proxy enforcing end-user authentication, and may not be set at all. The URL is derived entirely from the Alertmanager resource:
-
-```
-<scheme>://<service>.<namespace>.svc:9093<routePrefix>/api/v2/...
-```
-
-| Component     | Source                                                                                                                               |
-|---------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| `scheme`      | `https` when `spec.web.tlsConfig` is set, otherwise `http`                                                                           |
-| `service`     | `spec.serviceName` when set; otherwise `alertmanager-operated`, the headless service the operator creates and manages                |
-| `namespace`   | the namespace of the Alertmanager resource                                                                                           |
-| port          | `9093` — the port Alertmanager always listens on. `spec.portName` names that port in the Service and pod spec but does not change it |
-| `routePrefix` | `spec.routePrefix` when set, so handlers registered under a prefix are addressed correctly                                           |
-
-Two cases are easy to get wrong:
-
-* **`spec.serviceName` must be honoured.** When set, the operator does not create `alertmanager-operated` at all, so hardcoding that name dials a service that does not exist. The field is recommended for running several Alertmanager resources in one namespace — exactly the topology this proposal supports.
-* **`spec.listenLocal: true` makes the API unreachable.** It binds the web listener to `127.0.0.1`, affecting the API and UI but not gossip, so the Alertmanager stays healthy and the misconfiguration is otherwise invisible. Rather than retrying a connection that can never succeed, the controller sets `Accepted=False` with `reason: AlertmanagerNotAddressable`, naming the configuration rather than the network as the problem.
-
 ### Authentication
 
-The controller has no way to authenticate to the Alertmanager API, and this proposal does not add one. [#5836](https://github.com/prometheus-operator/prometheus-operator/issues/5836) tracks that work; no design is settled, and nothing here assumes a particular outcome. What this proposal does commit to:
+The operator's access to Alertmanager is mediated by the Secret, not by a direct API connection. Credentials for Alertmanager are therefore the sidecar's concern, not the operator's. The sidecar runs as a container in the Alertmanager pod and calls the local API endpoint; it can reach Alertmanager over localhost or the in-cluster service, depending on the deployment.
 
-* **Credentials belong to the Alertmanager resource, not to individual Silences.** One Alertmanager serves many Silences, so per-Silence credentials would be redundant and would push secret references into a resource application teams create for themselves. No Silence-specific authentication fields are introduced.
-* **`newClientForAlertmanager` is the only place a client is constructed.** Adopting whatever is agreed upstream is a change to one function rather than to the controller.
-* **A refused request is reported as a refusal.** The binding condition says `AlertmanagerUnauthorized` rather than reporting an outage or retrying in a loop (see [Failure handling](#failure-handling)).
+Granting the sidecar's service account the necessary Alertmanager API permissions is the responsibility of the user deploying Alertmanager. The operator does not manage the sidecar's RBAC — doing so would require managing the Alertmanager StatefulSet more invasively than is appropriate.
 
-Over HTTPS the certificate is verified against the system CA pool, or against a platform-injected service CA where one exists at a well-known path — OpenShift provides `/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt` — so Alertmanagers presenting platform-issued service certificates verify without extra configuration. Other custom CAs belong with the broader connection configuration in #5836.
+The operator does need RBAC to read and write the silence Secret in each Alertmanager's namespace (see [Feature Gate](#feature-gate)).
 
 ### Clustered Alertmanager
 
-Alertmanager replicates silences across replicas via its gossip mesh. The controller therefore treats an Alertmanager *resource* as the unit of reconciliation, not an individual replica: it writes the silence once, through the governing service, and lets gossip propagate it. The returned UUID is cluster-wide, so the `silenceID` stays valid regardless of which replica served the request.
+Alertmanager replicates silences across replicas via its gossip mesh. In the sidecar model, each pod has its own sidecar instance and each independently reconciles the same Secret against its local Alertmanager API. When a silence has already been created and propagated from another replica, the sidecar finds it in the list-by-annotation pass and either updates it (if different) or leaves it alone (if matching). If cluster replication is dysfunctional, each sidecar still converges its local instance independently — the result is consistent even if gossip is not.
 
-Replica-level accounting is deliberately out of scope at `v1alpha1`. Reporting how many replicas had converged would mean addressing each pod through the headless service and listing silences on every one, for every Silence, on every resync — O(silences x replicas) API calls to surface a condition gossip is expected to resolve within seconds. Replication health is Alertmanager's concern, already observable through its `alertmanager_cluster_*` metrics.
-
-The per-binding `Accepted` condition therefore reports whether the write to that Alertmanager resource succeeded, not whether every replica has converged. Per-replica visibility can be added to the binding later without breaking the shape defined here.
+The operator treats an Alertmanager *resource* as the unit of Secret reconciliation, not an individual replica. Per-replica visibility can be added later without changing the status shape defined here.
 
 ### Feature Gate
 
@@ -322,23 +335,27 @@ A `SilenceCRD` feature gate (default `false` at `v1alpha1`) controls whether the
 
 The gate is necessary but not sufficient. Even when enabled, the controller performs the same startup pre-flight as the other controllers: it verifies that the `Silence` CRD is installed and that the operator's service account holds the verbs below. It does not start if either check fails, and a failure is logged rather than fatal. This matters on upgrade, where the operator binary may roll out before the new CRD or the updated ClusterRole.
 
-| Resource              | Verbs                            |
-|-----------------------|----------------------------------|
-| `silences`            | `get`, `list`, `watch`, `update` |
-| `silences/status`     | `update`                         |
-| `silences/finalizers` | `update`                         |
+Enabling the `SilenceCRD` gate requires **Alertmanager >= 0.32.0**, which introduced annotation support for silences ([prometheus/alertmanager#4965](https://github.com/prometheus/alertmanager/pull/4965)). The pre-flight check should verify the Alertmanager version where discoverable.
 
-`update` on `silences` is needed for finalizer management, and `silences/finalizers` separately for clusters running the `OwnerReferencesPermissionEnforcement` admission plugin.
+| Resource          | Verbs                                                      |
+|-------------------|------------------------------------------------------------|
+| `silences`        | `get`, `list`, `watch`, `update`                           |
+| `silences/status` | `update`                                                   |
+| `secrets`         | `get`, `list`, `watch`, `create`, `update`, `patch`, `delete` |
+
+`update` on `silences` is needed to write `.status`. `secrets` access is needed to read and write the silence Secret in each Alertmanager's namespace. No finalizer is required and the `silences/finalizers` verb is not needed.
 
 ### Testing and Verification
 
-* Unit tests for the reconcile loop, status updates, and finalizer handling.
-* E2e tests against a real Alertmanager: create a Silence → verify the silence appears in Alertmanager API with correct `silenceID` stored in status; delete the Silence → verify silence is removed from Alertmanager.
-* E2e test for namespace isolation: verify `namespace=<ns>` matcher is injected when `alertmanagerConfigMatcherStrategy: OnNamespace`.
-* E2e tests for drift correction, one per outcome: edit a managed silence's `comment` through the Alertmanager API → verify the next reconcile restores it under the same `silenceID`; edit its matchers → verify it is restored and the **new** `silenceID` recorded in the binding; expire it early → likewise a new `silenceID`; delete it outright → verify it is recreated and the new UUID recorded.
-* E2e test for reconcile stability: create a Silence leaving `startsAt` defaulted, let it reconcile several times → verify `silenceID` never changes and that no expired duplicates accumulate in Alertmanager.
-* E2e test for coexistence: create a silence directly through the Alertmanager API → verify the controller leaves it untouched across reconciles.
-* E2e test for failure reporting: point a Silence at an unreachable Alertmanager → verify `Accepted=False` with `AlertmanagerUnreachable`, and that it recovers once the Alertmanager is available.
+* Unit tests for the reconcile loop, Secret write logic, and status updates (inline with implementation tasks).
+* Unit tests for namespace matcher injection across all three `alertmanagerConfigMatcherStrategy` values.
+* E2e tests against a real Alertmanager >= 0.32.0: create a Silence → verify the Secret is written with correct content and the silence appears in Alertmanager with the `monitoring.coreos.com/silence-uid` annotation; delete the Silence → verify its entry is removed from the Secret and the silence is eventually deleted from Alertmanager.
+* E2e test for namespace isolation: verify `namespace=<ns>` matcher is injected under `OnNamespace`, absent for a Silence in the AM namespace under `OnNamespaceExceptForAlertmanagerNamespace`, and absent under `None`.
+* E2e tests for drift correction: edit a managed silence's `comment` through the Alertmanager API → verify the sidecar's next reconcile restores it; delete the silence through the UI → verify the sidecar recreates it.
+* E2e test for orphan cleanup: delete a Silence CR → verify the sidecar removes the corresponding Alertmanager silence within one reconcile cycle.
+* E2e test for coexistence: create a silence directly through the Alertmanager API without the annotation → verify the sidecar leaves it untouched across reconciles.
+* E2e test for failure reporting: point a Silence at an Alertmanager with `spec.listenLocal: true` → verify `Accepted=False` with `AlertmanagerNotAddressable`.
+* Sidecar convergence metrics and alerting rules verified in the e2e environment.
 
 ## Alternatives
 
@@ -353,6 +370,22 @@ It was not taken. `createdBy` is editable in the UI, so one edit detaches the si
 The silence-operator (Giant Swarm) sets `comment` to `silence-operator-<namespace>-<name>` and does a list-and-filter on every reconcile. This makes reconciliation stateless, avoiding the optimistic-concurrency handling that writing back to `.status` requires — for example a finalizer update bumping the resource version and conflicting with a subsequent status write.
 
 It was not taken for the same reason as `createdBy`: the field is user-editable, and comment collisions across operators let one controller adopt another's silence. This proposal keeps `comment` as a user-defined field for change IDs and incident references, and never reads it back.
+
+### Store the Alertmanager-assigned UUID in `.status`
+
+An earlier revision of this proposal stored the Alertmanager-assigned silence UUID in `.status.bindings[].silenceID`. This made the controller stateful in a way that adds operational surface: the UUID must survive operator restarts; status writes must be synchronised with the API calls that produce them; resource-version conflicts between other updates and a status write required care.
+
+Annotation-based identity, using the support added in [alertmanager PR #4965](https://github.com/prometheus/alertmanager/pull/4965), resolves these issues. The sidecar discovers the UUID by querying Alertmanager directly — which is authoritative — rather than relying on a cached copy in Kubernetes. There is nothing to persist and nothing to go stale.
+
+### Direct controller → Alertmanager API calls
+
+An earlier revision had the `SilenceReconciler` call the Alertmanager REST API directly, without a sidecar. This raises several concerns:
+
+* **Synchronous calls to a remote service** couple the operator's availability to Alertmanager's. A slow or flapping Alertmanager stalls the operator's workqueue.
+* **Finalizers** were required to ensure deletion reached Alertmanager before the Kubernetes resource was removed. A stuck operator would block deletion indefinitely.
+* **Clustered Alertmanager**: writing through the governing service rather than to each replica individually relies on gossip replication being healthy, which cannot be assumed.
+
+The sidecar approach avoids all three: the operator writes only to the Kubernetes API; no finalizer is needed; each replica reconciles independently via its local sidecar.
 
 ### Extend the existing Alertmanager controller
 
@@ -378,42 +411,42 @@ The feature gate lands first so that every subsequent step can merge incremental
 
   <gh issue="">
 
-* [ ] Add the `Silence` type to `pkg/apis/monitoring/v1alpha1/`, including the CEL validation rules
+* [ ] Add the `Silence` type to the operator's API group (`pkg/apis/monitoring/v1alpha1/`), including the CEL validation rules, and generate CRD manifests, deepcopy and clients (with unit tests)
 
   <gh issue="">
 
-* [ ] Add `silenceSelector` / `silenceNamespaceSelector` to the `Alertmanager` type
+* [ ] Add `silenceSelector` / `silenceNamespaceSelector` to the `Alertmanager` type (with unit tests)
 
   <gh issue="">
 
-* [ ] Generate CRD manifests, deepcopy and clients; register the new type
+* [ ] Add the Silence and Secret rules to the operator ClusterRole and the bundled RBAC manifests
 
   <gh issue="">
 
-* [ ] Add the Silence rules to the operator ClusterRole and the bundled RBAC manifests
+* [ ] Add the controller startup pre-flight: CRD presence, RBAC permission checks, and Alertmanager version check (>= 0.32.0) where discoverable
 
   <gh issue="">
 
-* [ ] Add the controller startup pre-flight: CRD presence and RBAC permission checks
+* [ ] Implement `SilenceReconciler`: reconcile Silence CRs into per-Alertmanager Secrets, including selector resolution via the namespace informer (with unit tests)
 
   <gh issue="">
 
-* [ ] Implement the Alertmanager API client: endpoint resolution, silence create/read/delete, and classification of API errors into the documented condition reasons
+* [ ] Implement namespace matcher injection for all three `alertmanagerConfigMatcherStrategy` values (with unit tests)
 
   <gh issue="">
 
-* [ ] Implement `SilenceReconciler`: selector resolution via the namespace informer, namespace matcher injection, and finalizer handling
+* [ ] Implement status management: per-binding conditions and expiry handling (with unit tests)
 
   <gh issue="">
 
-* [ ] Implement status management: bindings, per-binding conditions, expiry handling and drift correction
+* [ ] Implement the `silence-sidecar` binary: Secret watcher, Alertmanager v2 API client, annotation-based identity tracking, orphan cleanup, and convergence metrics (with unit and integration tests)
 
   <gh issue="">
 
-* [ ] Documentation
+* [ ] Wire the `silence-sidecar` into the Alertmanager StatefulSet template
 
   <gh issue="">
 
-* [ ] Unit and e2e test coverage
+* [ ] Documentation: API reference, getting started guide, and sidecar deployment notes
 
   <gh issue="">

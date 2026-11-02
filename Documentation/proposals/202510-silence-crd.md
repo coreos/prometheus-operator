@@ -308,14 +308,7 @@ When the sidecar creates or updates a silence it sets:
 monitoring.coreos.com/silence-uid: <Silence CR UID>
 ```
 
-On each reconcile cycle the sidecar:
-
-1. Lists all Alertmanager silences carrying the `monitoring.coreos.com/silence-uid` annotation.
-2. For each entry in the Secret: looks up the Alertmanager silence by UID annotation.
-   - If **missing**: creates a new silence and sets the annotation.
-   - If **present but different**: updates the silence.
-   - If **matching**: no write.
-3. **Orphan pass**: deletes any Alertmanager silence whose annotation UID does not appear in the Secret — this handles the case where a Silence CR was deleted or its Alertmanager was de-selected.
+The annotation is the key used by the reconcile loop (described in [silence-sidecar § Reconcile loop](#reconcile-loop)) to create, update, and orphan-delete silences without touching anything the operator did not create.
 
 **The sidecar only touches silences it created.** Silences without the `monitoring.coreos.com/silence-uid` annotation — created through the UI, `amtool`, or any other client — are never examined, modified or deleted. Declarative management and ad-hoc silences coexist on the same Alertmanager without interference.
 

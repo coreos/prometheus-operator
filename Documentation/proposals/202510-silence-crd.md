@@ -43,7 +43,7 @@ Platform engineers and SREs operating Kubernetes clusters with prometheus-operat
 * Support multi-prometheus-operator deployments with per-operator silence scoping.
 * Provide namespace isolation via automatic matcher injection.
 * Track silence identity in a reliable fashion.
-* Confine credential handling to a single integration point, and report a refused request as an authentication failure rather than an outage. Do not assume the Alertmanager API is unauthenticated.
+* Confine credential handling to the Alertmanager resource, not individual Silences. Do not assume the Alertmanager API is unauthenticated. Auth failures (401/403) must be distinguishable from connectivity failures in sidecar metrics.
 
 ## Non-Goals
 
@@ -321,7 +321,9 @@ so Silence inherits the operator-wide semantics rather than reimplementing them.
 
 The operator's access to Alertmanager is mediated by the Secret, not by a direct API connection. The sidecar runs as a container in the Alertmanager pod and calls `localhost:9093` — in the unauthenticated default no additional credentials are needed.
 
-If Alertmanager has HTTP authentication configured via `spec.web.httpConfig`, the operator already has access to that configuration and injects the necessary credentials into the sidecar container when it adds it to the StatefulSet, following the same approach used elsewhere in the operator's StatefulSet management.
+**Credentials belong to the Alertmanager resource, not individual Silences.** One Alertmanager serves many Silences, so per-Silence credentials would be redundant and would push secret references into a resource application teams create for themselves. When Alertmanager has HTTP authentication configured via `spec.web.httpConfig`, the operator injects the necessary credentials into the sidecar container when it adds it to the StatefulSet — the same information already used elsewhere in the operator's StatefulSet management. This keeps credential surface area proportional to Alertmanager instances, not to the number of Silence resources.
+
+**Auth failures must be distinguishable from connectivity failures.** The sidecar must classify Alertmanager API responses: a `401` or `403` is a credential problem and must be exposed as a distinct counter or metric label (e.g. `reason="unauthorized"`) so operators can tell it apart from a connectivity failure (`reason="unreachable"`). A refused request is not an outage.
 
 Kubernetes RBAC for the sidecar to read the silence Secret is handled by the operator: when the `SilenceCRD` gate is enabled, the operator adds `get` and `watch` on the silence Secret to the existing Alertmanager service account's ClusterRole. No user action is required.
 

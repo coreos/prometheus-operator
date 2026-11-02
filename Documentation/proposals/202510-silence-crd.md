@@ -284,11 +284,11 @@ The sidecar never writes back to the Secret. It is a consumer, not a co-owner.
 
 The sidecar exposes a Prometheus metrics endpoint. Key metrics:
 
-| Metric                                        | Labels                                           | Description                                     |
-|-----------------------------------------------|--------------------------------------------------|-------------------------------------------------|
-| `silence_sidecar_reconcile_total`             | `result="success"` or `result="error"`           | Total reconcile attempts and their outcome      |
-| `silence_sidecar_sync_errors_total`           | `reason="unauthorized"`, `"unreachable"`, `"rejected"` | Breakdown of Alertmanager API failures    |
-| `silence_sidecar_last_sync_timestamp_seconds` | —                                                | Unix timestamp of the last successful reconcile |
+| Metric                                        | Labels                                                 | Description                                     |
+|-----------------------------------------------|--------------------------------------------------------|-------------------------------------------------|
+| `silence_sidecar_reconcile_total`             | `result="success"` or `result="error"`                 | Total reconcile attempts and their outcome      |
+| `silence_sidecar_sync_errors_total`           | `reason="unauthorized"`, `"unreachable"`, `"rejected"` | Breakdown of Alertmanager API failures          |
+| `silence_sidecar_last_sync_timestamp_seconds` | —                                                      | Unix timestamp of the last successful reconcile |
 
 `silence_sidecar_sync_errors_total` fulfils the auth-classification goal: `reason="unauthorized"` covers `401`/`403` responses, `reason="unreachable"` covers connection failures, and `reason="rejected"` covers `400`/`422` responses where Alertmanager rejected the silence payload. Operators can alert on the `unauthorized` label independently of general connectivity failures.
 

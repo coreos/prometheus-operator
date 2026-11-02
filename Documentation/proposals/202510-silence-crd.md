@@ -172,10 +172,10 @@ Secret  (one per Alertmanager instance)
   key:  silences.json
 
 silence-sidecar  (one per Alertmanager pod, like config-reloader)
-  watches the Secret
+  watches /etc/alertmanager/silences/silences.json (Secret mounted as a volume by the operator)
   calls local Alertmanager v2 API to create, update, or delete silences
   uses the Silence CR UID stored in an Alertmanager annotation to track identity
-  orphan pass: deletes any Alertmanager silence whose annotation UID is absent from the Secret
+  orphan pass: deletes any Alertmanager silence whose annotation UID is absent from the mounted file
 ```
 
 A dedicated `SilenceReconciler`, separate from the existing Alertmanager controller:
@@ -325,9 +325,11 @@ The operator's access to Alertmanager is mediated by the Secret, not by a direct
 
 **Auth failures must be distinguishable from connectivity failures.** The sidecar must classify Alertmanager API responses: a `401` or `403` is a credential problem and must be exposed as a distinct counter or metric label (e.g. `reason="unauthorized"`) so operators can tell it apart from a connectivity failure (`reason="unreachable"`). A refused request is not an outage.
 
-**The sidecar's Kubernetes RBAC is the user's responsibility.** The sidecar needs at minimum `get` on the silence Secret. To enable immediate reconciliation on Secret change rather than waiting for the next poll interval, `watch` is also required. Granting these permissions to the Alertmanager service account is the responsibility of the user deploying Alertmanager — the operator injects the sidecar container but does not take ownership of the Alertmanager SA's permissions, as doing so would require managing the Alertmanager deployment more invasively than is appropriate.
+**The sidecar reads a mounted file, not the Kubernetes API.** The operator mounts the silence Secret as a volume into the Alertmanager pod (alongside the generated config Secret, following the same pattern in `makeStatefulSetSpec`). The sidecar watches the file at `/etc/alertmanager/silences/silences.json`. The kubelet handles reading the Secret and updating the mounted file when the operator writes a new version — the Alertmanager service account requires no additional RBAC for this.
 
-The operator's own RBAC to read and write the silence Secret in each Alertmanager's namespace is shown in [Feature Gate](#feature-gate).
+Propagation follows the kubelet's Secret sync period (typically around one minute). For deployments that require immediate reconciliation on Secret change, the sidecar can instead watch the Secret via the Kubernetes API; this requires granting `watch` on Secrets to the Alertmanager service account, which is the responsibility of the user deploying Alertmanager.
+
+The operator's own RBAC to write the silence Secret in each Alertmanager's namespace is shown in [Feature Gate](#feature-gate).
 
 ### Clustered Alertmanager
 

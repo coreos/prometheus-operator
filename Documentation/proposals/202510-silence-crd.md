@@ -95,17 +95,17 @@ status:
 
 **Spec fields:**
 
-| Field                  | Type               | Required                             | Description                                                                                                                       |
-|------------------------|--------------------|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `matchers`             | `[]SilenceMatcher` | Yes (min 1)                          | Alert label matchers                                                                                                              |
-| `matchers[].name`      | string             | Yes                                  | Label name                                                                                                                        |
-| `matchers[].value`     | string             | No                                   | Label value or regex; empty matches alerts where the label is absent or empty                                                     |
-| `matchers[].matchType` | enum               | No (default `=`)                     | One of `=`, `!=`, `=~`, `!~`                                                                                                      |
-| `startsAt`             | RFC3339            | No                                   | Start time; defaults to creation timestamp                                                                                        |
-| `endsAt`               | RFC3339            | Exactly one of `endsAt` / `duration` | Expiry time                                                                                                                       |
-| `duration`             | `NonEmptyDuration` | Exactly one of `endsAt` / `duration` | Expiry as an offset from `startsAt`                                                                                               |
-| `comment`              | string             | Yes                                  | Human-readable annotation passed through to Alertmanager's `comment` field; useful for referencing change IDs or incident tickets |
-| `createdBy`            | string             | No (default `prometheus-operator`)   | Passed through to Alertmanager's `createdBy` field                                                                                |
+| Field                  | Type               | Required                             | Max length | Description                                                                                                                       |
+|------------------------|--------------------|--------------------------------------|------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| `matchers`             | `[]SilenceMatcher` | Yes (min 1)                          | —          | Alert label matchers                                                                                                              |
+| `matchers[].name`      | string             | Yes                                  | 256        | Label name                                                                                                                        |
+| `matchers[].value`     | string             | No                                   | 1024       | Label value or regex; empty matches alerts where the label is absent or empty                                                     |
+| `matchers[].matchType` | enum               | No (default `=`)                     | —          | One of `=`, `!=`, `=~`, `!~`                                                                                                      |
+| `startsAt`             | RFC3339            | No                                   | —          | Start time; defaults to creation timestamp                                                                                        |
+| `endsAt`               | RFC3339            | Exactly one of `endsAt` / `duration` | —          | Expiry time                                                                                                                       |
+| `duration`             | `NonEmptyDuration` | Exactly one of `endsAt` / `duration` | —          | Expiry as an offset from `startsAt`                                                                                               |
+| `comment`              | string             | Yes                                  | 1024       | Human-readable annotation passed through to Alertmanager's `comment` field; useful for referencing change IDs or incident tickets |
+| `createdBy`            | string             | No (default `prometheus-operator`)   | 256        | Passed through to Alertmanager's `createdBy` field                                                                                |
 
 CEL validation: exactly one of `endsAt` or `duration` must be set; when both `startsAt` and `endsAt` are present, `startsAt` must precede `endsAt`.
 
@@ -130,7 +130,7 @@ CEL validation: exactly one of `endsAt` or `duration` must be set; when both `st
 
 There is no top-level `conditions` or `observedGeneration`: a Silence may be selected by several Alertmanager resources and its state can legitimately differ between them, so both belong at the binding level.
 
-Unlike other configuration resources whose handlers can report the outcome of each write synchronously, the Silence controller writes desired state to a Secret and delegates the actual Alertmanager API calls to a sidecar (see [Controller](#controller)). The binding condition therefore reflects whether the operator succeeded in writing the Secret — the sidecar's convergence is observable through its own instrumentation.
+This follows the same pattern as other configuration resources: the controller writes desired state to a Secret, and a sidecar reads it and applies it to the target service. The distinction from the config-reloader is that triggering a config file reload is passive — Alertmanager reads its own configuration — whereas the silence-sidecar must make active CRUD API calls to Alertmanager to create, update, and delete silences. The binding condition therefore reflects Secret-write success, consistent with how other binding conditions reflect inclusion in the rendered configuration — the sidecar's convergence is observable through its own instrumentation.
 
 ### Alertmanager CRD Extensions
 
@@ -217,6 +217,8 @@ The Secret holds a JSON document under the key `silences.json`:
 Namespace matchers are pre-injected into `matchers` by the operator before writing; the sidecar posts the matchers verbatim without applying any injection logic. Timing fields are resolved to absolute RFC3339 timestamps (see [Alertmanager API Translation](#alertmanager-api-translation)) before the Secret is written.
 
 The operator owns the Secret. The sidecar reads it but never writes back to it.
+
+**Capacity.** A Kubernetes Secret is capped at 1 MiB (the etcd value size limit). At typical silence entry sizes of 400–800 bytes of JSON, a single Secret supports roughly 1,000–2,500 silences per Alertmanager instance before approaching the limit. This is unlikely to be reached in practice. Field-length limits on the CRD (see [API](#api)) protect against a single large `comment` or matcher value consuming a disproportionate share of the budget. Should the limit become a constraint, the natural mitigation is sharding across multiple indexed Secrets (`prometheus-operator-silences-<am-name>-0`, etc.) without changing the sidecar's design.
 
 #### Observability
 
@@ -317,11 +319,13 @@ so Silence inherits the operator-wide semantics rather than reimplementing them.
 
 ### Authentication
 
-The operator's access to Alertmanager is mediated by the Secret, not by a direct API connection. Credentials for Alertmanager are therefore the sidecar's concern, not the operator's. The sidecar runs as a container in the Alertmanager pod and calls the local API endpoint; it can reach Alertmanager over localhost or the in-cluster service, depending on the deployment.
+The operator's access to Alertmanager is mediated by the Secret, not by a direct API connection. The sidecar runs as a container in the Alertmanager pod and calls `localhost:9093` — in the unauthenticated default no additional credentials are needed.
 
-Granting the sidecar's service account the necessary Alertmanager API permissions is the responsibility of the user deploying Alertmanager. The operator does not manage the sidecar's RBAC — doing so would require managing the Alertmanager StatefulSet more invasively than is appropriate.
+If Alertmanager has HTTP authentication configured via `spec.web.httpConfig`, the operator already has access to that configuration and injects the necessary credentials into the sidecar container when it adds it to the StatefulSet, following the same approach used elsewhere in the operator's StatefulSet management.
 
-The operator does need RBAC to read and write the silence Secret in each Alertmanager's namespace (see [Feature Gate](#feature-gate)).
+Kubernetes RBAC for the sidecar to read the silence Secret is handled by the operator: when the `SilenceCRD` gate is enabled, the operator adds `get` and `watch` on the silence Secret to the existing Alertmanager service account's ClusterRole. No user action is required.
+
+The operator's own RBAC to read and write the silence Secret in each Alertmanager's namespace is shown in [Feature Gate](#feature-gate).
 
 ### Clustered Alertmanager
 

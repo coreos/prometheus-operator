@@ -342,6 +342,8 @@ This matches the convention already used by `AlertmanagerConfig` matchers.
 
 **Timing:** the API requires `startsAt` and `endsAt` as absolute RFC3339 timestamps; there is no `duration` at the API level. The operator computes `endsAt = startsAt + duration` before writing to the Secret, defaulting `startsAt` to the resource's creation timestamp. Because exactly one of `endsAt` or `duration` is always present, a concrete `endsAt` can always be computed and no synthetic far-future expiry is ever written.
 
+**`startsAt` normalisation.** When a silence is posted with a `startsAt` in the past — which is the common case for a Silence CR that was created before its start time elapsed — Alertmanager normalises `startsAt` to the current time. The value stored in Alertmanager will therefore differ from the `startsAt` written to the Secret. The sidecar's update-detection logic must not compare `startsAt`, or it will trigger a spurious update on every reconcile cycle. Only `endsAt`, matchers, `comment`, and `createdBy` are used to decide whether an update is needed.
+
 ### Namespace Isolation
 
 The existing `alertmanagerConfigMatcherStrategy` field controls whether a `namespace` matcher is injected into `AlertmanagerConfig` routes and inhibit rules. The Silence controller reads the **same field**, giving operators a single knob for namespace isolation across both config-based and silence-based resources.

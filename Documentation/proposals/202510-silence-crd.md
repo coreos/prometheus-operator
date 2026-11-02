@@ -219,6 +219,7 @@ Namespace matchers are pre-injected into `matchers` by the operator before writi
 The operator owns the Secret. The sidecar reads it but never writes back to it.
 
 **Capacity.** A Kubernetes Secret is capped at 1 MiB (the etcd value size limit). At typical silence entry sizes of 400–800 bytes of JSON, a single Secret supports roughly 1,000–2,500 silences per Alertmanager instance before approaching the limit. This is unlikely to be reached in practice. Field-length limits on the CRD (see [API](#api)) protect against a single large `comment` or matcher value consuming a disproportionate share of the budget. Should the limit become a constraint, the natural mitigation is sharding across multiple indexed Secrets (`prometheus-operator-silences-<am-name>-0`, etc.) without changing the sidecar's design.
+
 #### Observability
 
 The `SilenceReconciler` registers no metrics of its own beyond those the operator already exports for every controller via `controller="silence"`: `prometheus_operator_reconcile_operations_total`, `prometheus_operator_reconcile_errors_total`, `prometheus_operator_reconcile_duration_seconds`, and the full workqueue family. Alerting on Secret-write failures is then `prometheus_operator_reconcile_errors_total{controller="silence"}`.
@@ -259,11 +260,11 @@ No changes to existing containers are required.
 
 #### Configuration
 
-| Flag                 | Default                                          | Description                              |
-|----------------------|--------------------------------------------------|------------------------------------------|
-| `--silence-file`     | `/etc/alertmanager/silences/silences.json`       | Path to the mounted silences JSON file   |
-| `--alertmanager-url` | `http://localhost:9093`                          | Local Alertmanager API endpoint          |
-| `--web.listen-address` | `:9097`                                        | Address to expose the metrics endpoint   |
+| Flag                   | Default                                    | Description                            |
+|------------------------|--------------------------------------------|----------------------------------------|
+| `--silence-file`       | `/etc/alertmanager/silences/silences.json` | Path to the mounted silences JSON file |
+| `--alertmanager-url`   | `http://localhost:9093`                    | Local Alertmanager API endpoint        |
+| `--web.listen-address` | `:9097`                                    | Address to expose the metrics endpoint |
 
 #### Reconcile loop
 
@@ -283,11 +284,11 @@ The sidecar never writes back to the Secret. It is a consumer, not a co-owner.
 
 The sidecar exposes a Prometheus metrics endpoint. Key metrics:
 
-| Metric                                         | Labels                              | Description                                        |
-|------------------------------------------------|-------------------------------------|----------------------------------------------------|
-| `silence_sidecar_reconcile_total`              | `result="success\|error"`           | Total reconcile attempts and their outcome         |
-| `silence_sidecar_sync_errors_total`            | `reason="unauthorized\|unreachable\|rejected"` | Breakdown of Alertmanager API failures  |
-| `silence_sidecar_last_sync_timestamp_seconds`  | —                                   | Unix timestamp of the last successful reconcile    |
+| Metric                                        | Labels                                           | Description                                     |
+|-----------------------------------------------|--------------------------------------------------|-------------------------------------------------|
+| `silence_sidecar_reconcile_total`             | `result="success"` or `result="error"`           | Total reconcile attempts and their outcome      |
+| `silence_sidecar_sync_errors_total`           | `reason="unauthorized"`, `"unreachable"`, `"rejected"` | Breakdown of Alertmanager API failures    |
+| `silence_sidecar_last_sync_timestamp_seconds` | —                                                | Unix timestamp of the last successful reconcile |
 
 `silence_sidecar_sync_errors_total` fulfils the auth-classification goal: `reason="unauthorized"` covers `401`/`403` responses, `reason="unreachable"` covers connection failures, and `reason="rejected"` covers `400`/`422` responses where Alertmanager rejected the silence payload. Operators can alert on the `unauthorized` label independently of general connectivity failures.
 
@@ -340,11 +341,11 @@ This matches the convention already used by `AlertmanagerConfig` matchers.
 
 The existing `alertmanagerConfigMatcherStrategy` field controls whether a `namespace` matcher is injected into `AlertmanagerConfig` routes and inhibit rules. The Silence controller reads the **same field**, giving operators a single knob for namespace isolation across both config-based and silence-based resources.
 
-| Strategy value                                | Behavior for Silence resources                                                                           |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `OnNamespace` (default)                       | Prepends `namespace=<resource namespace>` to matchers before Secret write                                |
-| `OnNamespaceExceptForAlertmanagerNamespace`   | Same, except Silences in the Alertmanager's own namespace receive no namespace matcher                   |
-| `None`                                        | No namespace matcher is injected                                                                         |
+| Strategy value                              | Behavior for Silence resources                                                         |
+|---------------------------------------------|----------------------------------------------------------------------------------------|
+| `OnNamespace` (default)                     | Prepends `namespace=<resource namespace>` to matchers before Secret write              |
+| `OnNamespaceExceptForAlertmanagerNamespace` | Same, except Silences in the Alertmanager's own namespace receive no namespace matcher |
+| `None`                                      | No namespace matcher is injected                                                       |
 
 When injection applies, the operator prepends `namespace=<resource namespace>` before writing to the Secret: a Silence in namespace `frontend` with matcher `severity=critical` is written as `namespace="frontend" AND severity="critical"`. The sidecar posts the matchers verbatim; it applies no strategy logic of its own.
 
@@ -395,10 +396,10 @@ Enabling the `SilenceCRD` gate requires **Alertmanager >= 0.32.0**, which introd
 
 The version check is not part of the startup pre-flight. The operator manages the Alertmanager StatefulSet and always knows the version — either from `spec.image` on the Alertmanager CR, or from the operator's built-in default (a compile-time constant). The check is performed per-Alertmanager during the reconcile loop: if the resolved image tag indicates a version below `0.32.0`, the controller sets `Accepted=False` with `reason: AlertmanagerVersionTooOld` on the binding and skips the Secret write for that instance.
 
-| Resource          | Verbs                                                      |
-|-------------------|------------------------------------------------------------|
-| `silences`        | `get`, `list`, `watch`, `update`                           |
-| `silences/status` | `update`                                                   |
+| Resource          | Verbs                                                         |
+|-------------------|---------------------------------------------------------------|
+| `silences`        | `get`, `list`, `watch`, `update`                              |
+| `silences/status` | `update`                                                      |
 | `secrets`         | `get`, `list`, `watch`, `create`, `update`, `patch`, `delete` |
 
 `update` on `silences` is needed to write `.status`. `secrets` access is needed to read and write the silence Secret in each Alertmanager's namespace. No finalizer is required and the `silences/finalizers` verb is not needed.

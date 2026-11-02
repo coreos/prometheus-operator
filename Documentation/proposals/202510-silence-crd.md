@@ -341,7 +341,9 @@ A `SilenceCRD` feature gate (default `false` at `v1alpha1`) controls whether the
 
 The gate is necessary but not sufficient. Even when enabled, the controller performs the same startup pre-flight as the other controllers: it verifies that the `Silence` CRD is installed and that the operator's service account holds the verbs below. It does not start if either check fails, and a failure is logged rather than fatal. This matters on upgrade, where the operator binary may roll out before the new CRD or the updated ClusterRole.
 
-Enabling the `SilenceCRD` gate requires **Alertmanager >= 0.32.0**, which introduced annotation support for silences ([prometheus/alertmanager#4965](https://github.com/prometheus/alertmanager/pull/4965)). The pre-flight check should verify the Alertmanager version where discoverable.
+Enabling the `SilenceCRD` gate requires **Alertmanager >= 0.32.0**, which introduced annotation support for silences ([prometheus/alertmanager#4965](https://github.com/prometheus/alertmanager/pull/4965)). This requirement is recorded in the compatibility matrix (`Documentation/getting-started/compatibility.md`).
+
+The version check is not part of the startup pre-flight. The operator manages the Alertmanager StatefulSet and always knows the version — either from `spec.image` on the Alertmanager CR, or from the operator's built-in default (a compile-time constant). The check is performed per-Alertmanager during the reconcile loop: if the resolved image tag indicates a version below `0.32.0`, the controller sets `Accepted=False` with `reason: AlertmanagerVersionTooOld` on the binding and skips the Secret write for that instance.
 
 | Resource          | Verbs                                                      |
 |-------------------|------------------------------------------------------------|
@@ -429,7 +431,11 @@ The feature gate lands first so that every subsequent step can merge incremental
 
   <gh issue="">
 
-* [ ] Add the controller startup pre-flight: CRD presence, RBAC permission checks, and Alertmanager version check (>= 0.32.0) where discoverable
+* [ ] Add the controller startup pre-flight: CRD presence and operator SA RBAC permission checks
+
+  <gh issue="">
+
+* [ ] Add per-Alertmanager version check to the reconcile loop: resolve version from `spec.image` or operator default; set `AlertmanagerVersionTooOld` binding condition and skip Secret write if below 0.32.0; update `Documentation/getting-started/compatibility.md` with the minimum AM version requirement (with unit tests)
 
   <gh issue="">
 

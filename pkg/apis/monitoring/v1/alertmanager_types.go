@@ -647,7 +647,7 @@ type AlertmanagerWebSpec struct {
 	// Alertmanager's `--web.cors.origin` flag.
 	// It requires Alertmanager >= v0.34.2.
 	//
-	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^\S+$`
 	// +optional
 	CORSOrigin *string `json:"corsOrigin,omitempty"`
 }

@@ -8832,7 +8832,7 @@ func TestSanitizeDiscordConfig(t *testing.T) {
 					},
 				},
 			},
-			golden: "discord_config_with_webhook_url_file_dropped_for_unsupported_version.golden",
+			expectErr: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

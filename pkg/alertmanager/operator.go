@@ -1471,13 +1471,13 @@ func checkDiscordConfigs(
 		}
 
 		if amVersion.LT(semver.MustParse("0.28.0")) {
-			if config.Content != nil {
+			if ptr.Deref(config.Content, "") != "" {
 				return fmt.Errorf(`'content' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 			}
-			if config.Username != nil {
+			if ptr.Deref(config.Username, "") != "" {
 				return fmt.Errorf(`'username' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 			}
-			if config.AvatarURL != nil {
+			if ptr.Deref(config.AvatarURL, "") != "" {
 				return fmt.Errorf(`'avartarURL' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 			}
 		}

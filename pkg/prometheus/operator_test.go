@@ -388,6 +388,21 @@ func TestValidateRemoteWriteConfig(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "with_invalid_write_relabel_regex",
+			spec: monitoringv1.RemoteWriteSpec{
+				URL: monitoringv1.URL("http://example.com"),
+				WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+					{
+						Action:       "replace",
+						Regex:        "(ab",
+						SourceLabels: []monitoringv1.LabelName{"__name__"},
+						TargetLabel:  "foo",
+					},
+				},
+			},
+			expectErr: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1028,4 +1043,21 @@ func TestStatefulSetReporterProcess(t *testing.T) {
 			require.Equal(t, tc.exp, status)
 		})
 	}
+}
+
+func TestValidateRemoteWriteSpecWithoutPrometheus(t *testing.T) {
+	cg, err := NewConfigGenerator(slog.New(slog.DiscardHandler), nil, WithoutVersionCheck())
+	require.NoError(t, err)
+
+	err = cg.validateRemoteWriteSpec(monitoringv1.RemoteWriteSpec{
+		URL: monitoringv1.URL("http://example.com"),
+		WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+			{
+				Action:       "lowercase",
+				SourceLabels: []monitoringv1.LabelName{"__name__"},
+				TargetLabel:  "foo",
+			},
+		},
+	})
+	require.NoError(t, err)
 }

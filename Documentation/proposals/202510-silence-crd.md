@@ -430,6 +430,24 @@ Both approaches are compatible with the sidecar's file-watching design — the s
 
 The alternative to volume-mounting — having the sidecar watch Secrets via the Kubernetes API — removes the StatefulSet restart constraint entirely: the sidecar could list-watch any number of Secrets dynamically. This reintroduces RBAC on the Alertmanager service account (the volume-mount approach was chosen precisely to avoid it) but may be the right trade-off for deployments operating at that scale.
 
+### Distribute silences across Alertmanager pods
+
+In a clustered Alertmanager (multiple replicas), the current design has every sidecar reconcile every silence. All sidecars read the same Secret, all call their local Alertmanager API to create/update the same set of silences, and Alertmanager's gossip mesh replicates them across the cluster. When a sidecar finds a silence already present (created by another replica's sidecar and propagated via gossip), it checks whether an update is needed and either writes or skips.
+
+An alternative is to **assign each silence to a specific pod** — for example, hashing the Silence CR UID modulo the replica count, so only one sidecar is responsible for reconciling a given silence. This would eliminate the redundant API calls and the brief window where multiple sidecars race to create the same silence.
+
+**Why distribution was not adopted:**
+
+1. **Gossip dependency.** Distribution relies on Alertmanager gossip working correctly to propagate the silence from the assigned pod to the others. If gossip is broken or a network partition isolates a pod, only the silences assigned to reachable pods would be present. A fallback mechanism — having another pod adopt orphaned silences after a timeout — adds complexity and still leaves a gap during the timeout window.
+
+2. **Pod churn.** When replicas scale up or down, or a pod is evicted and replaced, the hash-to-pod mapping changes. Silences would need to be reassigned, which either requires coordination (complex) or results in temporarily duplicated work during the transition.
+
+3. **Generation tracking is sufficient.** The `generation` field added to each Secret entry prevents stale writes: if a sidecar's mounted Secret is outdated and another sidecar has already updated the silence to a newer generation, the stale sidecar skips the write. This makes the brute-force approach safe even when Secret propagation to different pods is slightly skewed.
+
+4. **Simplicity.** The brute-force approach has no special cases. Every sidecar does the same thing, and the outcome is correct whether zero, one, or all of them succeed. Distribution introduces conditional logic (am I the owner of this silence?), failure detection (is the owner pod healthy?), and handoff (reassign on scale or failure).
+
+The redundant API calls are cheap relative to the operational complexity of distributed ownership. Alertmanager's silence API is designed for concurrent writes — the annotation UID is the natural deduplication key, and the gossip mesh ensures eventual consistency. The current design leans into this rather than fighting it.
+
 ### Use `createdBy` as the correlation key
 
 Writing `<namespace>/<name>` into the Alertmanager `createdBy` field, so a silence returned by the API can be matched back to its custom resource, was suggested during review of the earlier proposal. It removes the need to persist anything in `.status`.

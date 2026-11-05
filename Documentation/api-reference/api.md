@@ -882,6 +882,34 @@ process incoming alerts.</p>
 </tr>
 <tr>
 <td>
+<code>alertmanagerConfigFileSystemMode</code><br/>
+<em>
+<a href="#monitoring.coreos.com/v1.AlertmanagerConfigFileSystemMode">
+AlertmanagerConfigFileSystemMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>alertmanagerConfigFileSystemMode defines how the operator handles
+AlertmanagerConfig resources which have references to the Alertmanager
+container&rsquo;s filesystem (as opposed to secret key references). Users
+controlling the receiver&rsquo;s service may create an AlertmanagerConfig
+resource with a reference to a container&rsquo;s file (for instance using
+<code>botTokenFile</code> for the Telegram receiver) and exfiltrate sensitive
+content from files located in the Alertmanager container.</p>
+<p>Supported values are:
+- &ldquo;DenyAll&rdquo; denies any AlertmanagerConfig resource referencing files from the container&rsquo;s filesystem, non-compliant resources are rejected.
+- &ldquo;FromAlertmanagerConfigMatcherStrategy&rdquo; uses the <code>alertmanagerConfigNamespaceSelector</code> field to make a decision
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;None&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo;
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;OnNamespaceExceptForAlertmanagerNamespace&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo; for the AlertmanagerConfig resources located in the Alertmanager&rsquo;s namespace and &ldquo;DenyAll&rdquo; for all other resources.
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;OnNamespace&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo; for the main AlertmanagerConfig resource (defined in <code>.spec.alertmanagerConfig.name</code>) and &ldquo;DenyAll&rdquo; for all other resources.
+- &ldquo;AllowAll&rdquo; allows any AlertmanagerConfig resource to reference files from the container&rsquo;s filesystem (use with caution).</p>
+<p>By default, the operator uses the &ldquo;FromAlertmanagerConfigMatcherStrategy&rdquo; mode.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>minReadySeconds</code><br/>
 <em>
 int32
@@ -6143,6 +6171,39 @@ proxies during CONNECT requests.</p>
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="monitoring.coreos.com/v1.AlertmanagerConfigFileSystemMode">AlertmanagerConfigFileSystemMode
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#monitoring.coreos.com/v1.AlertmanagerSpec">AlertmanagerSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;AllowAll&#34;</p></td>
+<td><p>AllowAllAlertmanagerConfigFileSystemMode (&ldquo;AllowAll&rdquo;) allows any
+AlertmanagerConfig resource to reference files from the Alertmanager
+container&rsquo;s filesystem.</p>
+</td>
+</tr><tr><td><p>&#34;DenyAll&#34;</p></td>
+<td><p>DenyAllAlertmanagerConfigFileSystemMode (&ldquo;DenyAll&rdquo;) denies any
+AlertmanagerConfig resource which references files from the Alertmanager
+container&rsquo;s filesystem.</p>
+</td>
+</tr><tr><td><p>&#34;FromAlertmanagerConfigMatcherStrategy&#34;</p></td>
+<td><p>FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode
+(&ldquo;FromAlertmanagerConfigMatcherStrategy&rdquo;) uses the
+<code>alertmanagerConfigNamespaceSelector</code> field to make a decision on
+denying/allowing AlertmanagerConfig resources which reference files from
+the Alertmanager container&rsquo;s filesystem.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="monitoring.coreos.com/v1.AlertmanagerConfigMatcherStrategy">AlertmanagerConfigMatcherStrategy
 </h3>
 <p>
@@ -7612,6 +7673,34 @@ AlertmanagerConfigMatcherStrategy
 <em>(Optional)</em>
 <p>alertmanagerConfigMatcherStrategy defines how AlertmanagerConfig objects
 process incoming alerts.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>alertmanagerConfigFileSystemMode</code><br/>
+<em>
+<a href="#monitoring.coreos.com/v1.AlertmanagerConfigFileSystemMode">
+AlertmanagerConfigFileSystemMode
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>alertmanagerConfigFileSystemMode defines how the operator handles
+AlertmanagerConfig resources which have references to the Alertmanager
+container&rsquo;s filesystem (as opposed to secret key references). Users
+controlling the receiver&rsquo;s service may create an AlertmanagerConfig
+resource with a reference to a container&rsquo;s file (for instance using
+<code>botTokenFile</code> for the Telegram receiver) and exfiltrate sensitive
+content from files located in the Alertmanager container.</p>
+<p>Supported values are:
+- &ldquo;DenyAll&rdquo; denies any AlertmanagerConfig resource referencing files from the container&rsquo;s filesystem, non-compliant resources are rejected.
+- &ldquo;FromAlertmanagerConfigMatcherStrategy&rdquo; uses the <code>alertmanagerConfigNamespaceSelector</code> field to make a decision
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;None&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo;
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;OnNamespaceExceptForAlertmanagerNamespace&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo; for the AlertmanagerConfig resources located in the Alertmanager&rsquo;s namespace and &ldquo;DenyAll&rdquo; for all other resources.
+- When <code>alertmanagerConfigNamespaceSelector</code> is &ldquo;OnNamespace&rdquo;, it is equivalent to &ldquo;AllowAll&rdquo; for the main AlertmanagerConfig resource (defined in <code>.spec.alertmanagerConfig.name</code>) and &ldquo;DenyAll&rdquo; for all other resources.
+- &ldquo;AllowAll&rdquo; allows any AlertmanagerConfig resource to reference files from the container&rsquo;s filesystem (use with caution).</p>
+<p>By default, the operator uses the &ldquo;FromAlertmanagerConfigMatcherStrategy&rdquo; mode.</p>
 </td>
 </tr>
 <tr>

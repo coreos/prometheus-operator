@@ -4,7 +4,7 @@
   "metadata": {
     "annotations": {
       "controller-gen.kubebuilder.io/version": "v0.22.0",
-      "operator.prometheus.io/version": "0.94.2"
+      "operator.prometheus.io/version": "0.95.0"
     },
     "name": "alertmanagers.monitoring.coreos.com"
   },
@@ -869,6 +869,15 @@
                       }
                     },
                     "type": "object"
+                  },
+                  "alertmanagerConfigFileSystemMode": {
+                    "description": "alertmanagerConfigFileSystemMode defines how the operator handles\nAlertmanagerConfig resources which have references to the Alertmanager\ncontainer's filesystem (as opposed to secret key references). Users\ncontrolling the receiver's service may create an AlertmanagerConfig\nresource with a reference to a container's file (for instance using\n`botTokenFile` for the Telegram receiver) and exfiltrate sensitive\ncontent from files located in the Alertmanager container.\n\nSupported values are:\n- \"DenyAll\" denies any AlertmanagerConfig resource referencing files from the container's filesystem, non-compliant resources are rejected.\n- \"FromAlertmanagerConfigMatcherStrategy\" uses the `alertmanagerConfigNamespaceSelector` field to make a decision\n  - When `alertmanagerConfigNamespaceSelector` is \"None\", it is equivalent to \"AllowAll\"\n  - When `alertmanagerConfigNamespaceSelector` is \"OnNamespaceExceptForAlertmanagerNamespace\", it is equivalent to \"AllowAll\" for the AlertmanagerConfig resources located in the Alertmanager's namespace and \"DenyAll\" for all other resources.\n  - When `alertmanagerConfigNamespaceSelector` is \"OnNamespace\", it is equivalent to \"AllowAll\" for the main AlertmanagerConfig resource (defined in `.spec.alertmanagerConfig.name`) and \"DenyAll\" for all other resources.\n- \"AllowAll\" allows any AlertmanagerConfig resource to reference files from the container's filesystem (use with caution).\n\nBy default, the operator uses the \"FromAlertmanagerConfigMatcherStrategy\" mode.",
+                    "enum": [
+                      "AllowAll",
+                      "FromAlertmanagerConfigMatcherStrategy",
+                      "DenyAll"
+                    ],
+                    "type": "string"
                   },
                   "alertmanagerConfigMatcherStrategy": {
                     "description": "alertmanagerConfigMatcherStrategy defines how AlertmanagerConfig objects\nprocess incoming alerts.",

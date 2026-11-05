@@ -375,7 +375,7 @@ The operator's access to Alertmanager is mediated by the Secret, not by a direct
 
 **The sidecar reads a mounted file, not the Kubernetes API.** The operator mounts the silence Secret as a volume into the Alertmanager pod (alongside the generated config Secret, following the same pattern in `makeStatefulSetSpec`). The sidecar watches the file at `/etc/alertmanager/silences/silences.json`. The kubelet handles reading the Secret and updating the mounted file when the operator writes a new version — the Alertmanager service account requires no additional RBAC for this.
 
-Propagation follows the kubelet's Secret sync period (typically around one minute). For deployments that require immediate reconciliation on Secret change, the sidecar can instead watch the Secret via the Kubernetes API; this requires granting `watch` on Secrets to the Alertmanager service account, which is the responsibility of the user deploying Alertmanager.
+**Immediate propagation via pod nudge.** After writing the Secret, the operator updates an annotation on the Alertmanager StatefulSet pods (e.g., `operator.prometheus.io/silences-updated: <timestamp>`). This triggers the kubelet to reconcile the pod spec and remount volumes immediately, avoiding the default sync period delay (typically around one minute). The sidecar's filesystem watch detects the file change and reconciles within seconds of the Secret write.
 
 The operator's own RBAC to write the silence Secret in each Alertmanager's namespace is shown in [Feature Gate](#feature-gate).
 

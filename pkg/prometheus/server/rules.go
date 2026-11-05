@@ -116,5 +116,5 @@ func (c *Operator) createOrUpdateRuleConfigMaps(ctx context.Context, p *monitori
 		return nil, fmt.Errorf("synchronizing PrometheusRules failed: %w", err)
 	}
 
-	return prs.AppendConfigMapNames(configMapNames, int(ptr.Deref(p.Spec.RuleConfigMapMinCount, 3))), nil
+	return prs.AppendConfigMapNames(configMapNames, int(ptr.Deref(p.Spec.RuleConfigMapsMinimumCount, 3))), nil
 }

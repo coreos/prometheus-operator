@@ -4042,14 +4042,14 @@ namespace only.</p>
 </tr>
 <tr>
 <td>
-<code>ruleConfigMapMinCount</code><br/>
+<code>ruleConfigMapsMinimumCount</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ruleConfigMapMinCount defines the minimum number of rule ConfigMap volumes
+<p>ruleConfigMapsMinimumCount defines the minimum number of rule ConfigMap volumes
 mounted in each Prometheus Pod. Unused volumes reference ConfigMaps that do
 not exist and are mounted with optional: true.
 Reserving volumes avoids a Pod rollout when the number of generated rule
@@ -17510,14 +17510,14 @@ namespace only.</p>
 </tr>
 <tr>
 <td>
-<code>ruleConfigMapMinCount</code><br/>
+<code>ruleConfigMapsMinimumCount</code><br/>
 <em>
 int32
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>ruleConfigMapMinCount defines the minimum number of rule ConfigMap volumes
+<p>ruleConfigMapsMinimumCount defines the minimum number of rule ConfigMap volumes
 mounted in each Prometheus Pod. Unused volumes reference ConfigMaps that do
 not exist and are mounted with optional: true.
 Reserving volumes avoids a Pod rollout when the number of generated rule

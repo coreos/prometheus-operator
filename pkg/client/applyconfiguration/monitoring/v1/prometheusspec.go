@@ -82,7 +82,7 @@ type PrometheusSpecApplyConfiguration struct {
 	// matches all namespaces. A null label selector matches the current
 	// namespace only.
 	RuleNamespaceSelector *metav1.LabelSelectorApplyConfiguration `json:"ruleNamespaceSelector,omitempty"`
-	// ruleConfigMapMinCount defines the minimum number of rule ConfigMap volumes
+	// ruleConfigMapsMinimumCount defines the minimum number of rule ConfigMap volumes
 	// mounted in each Prometheus Pod. Unused volumes reference ConfigMaps that do
 	// not exist and are mounted with optional: true.
 	// Reserving volumes avoids a Pod rollout when the number of generated rule
@@ -91,7 +91,7 @@ type PrometheusSpecApplyConfiguration struct {
 	// All generated rule ConfigMaps are mounted even if their count exceeds this
 	// value. Changing the number of mounted volumes triggers a Pod rollout.
 	// Defaults to 3. Set to 0 to mount only the generated rule ConfigMaps.
-	RuleConfigMapMinCount *int32 `json:"ruleConfigMapMinCount,omitempty"`
+	RuleConfigMapsMinimumCount *int32 `json:"ruleConfigMapsMinimumCount,omitempty"`
 	// query defines the configuration of the Prometheus query service.
 	Query *QuerySpecApplyConfiguration `json:"query,omitempty"`
 	// alerting defines the settings related to Alertmanager.
@@ -1173,11 +1173,11 @@ func (b *PrometheusSpecApplyConfiguration) WithRuleNamespaceSelector(value *meta
 	return b
 }
 
-// WithRuleConfigMapMinCount sets the RuleConfigMapMinCount field in the declarative configuration to the given value
+// WithRuleConfigMapsMinimumCount sets the RuleConfigMapsMinimumCount field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the RuleConfigMapMinCount field is set to the value of the last call.
-func (b *PrometheusSpecApplyConfiguration) WithRuleConfigMapMinCount(value int32) *PrometheusSpecApplyConfiguration {
-	b.RuleConfigMapMinCount = &value
+// If called multiple times, the RuleConfigMapsMinimumCount field is set to the value of the last call.
+func (b *PrometheusSpecApplyConfiguration) WithRuleConfigMapsMinimumCount(value int32) *PrometheusSpecApplyConfiguration {
+	b.RuleConfigMapsMinimumCount = &value
 	return b
 }
 

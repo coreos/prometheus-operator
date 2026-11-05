@@ -46300,10 +46300,9 @@ spec:
                   the server serves requests under a different route prefix. For example
                   for use with `kubectl proxy`.
                 type: string
-              ruleConfigMapMinCount:
-                default: 3
+              ruleConfigMapsMinimumCount:
                 description: |-
-                  ruleConfigMapMinCount defines the minimum number of rule ConfigMap volumes
+                  ruleConfigMapsMinimumCount defines the minimum number of rule ConfigMap volumes
                   mounted in each Prometheus Pod. Unused volumes reference ConfigMaps that do
                   not exist and are mounted with optional: true.
                   Reserving volumes avoids a Pod rollout when the number of generated rule

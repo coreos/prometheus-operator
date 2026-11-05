@@ -1289,7 +1289,7 @@ type PrometheusSpec struct {
 	// +optional
 	RuleNamespaceSelector *metav1.LabelSelector `json:"ruleNamespaceSelector,omitempty"`
 
-	// ruleConfigMapMinCount defines the minimum number of rule ConfigMap volumes
+	// ruleConfigMapsMinimumCount defines the minimum number of rule ConfigMap volumes
 	// mounted in each Prometheus Pod. Unused volumes reference ConfigMaps that do
 	// not exist and are mounted with optional: true.
 	// Reserving volumes avoids a Pod rollout when the number of generated rule
@@ -1299,9 +1299,8 @@ type PrometheusSpec struct {
 	// value. Changing the number of mounted volumes triggers a Pod rollout.
 	// Defaults to 3. Set to 0 to mount only the generated rule ConfigMaps.
 	// +kubebuilder:validation:Minimum=0
-	// +kubebuilder:default=3
 	// +optional
-	RuleConfigMapMinCount *int32 `json:"ruleConfigMapMinCount,omitempty"`
+	RuleConfigMapsMinimumCount *int32 `json:"ruleConfigMapsMinimumCount,omitempty"`
 
 	// query defines the configuration of the Prometheus query service.
 	// +optional

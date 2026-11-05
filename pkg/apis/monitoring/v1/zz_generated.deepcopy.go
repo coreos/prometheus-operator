@@ -508,6 +508,11 @@ func (in *AlertmanagerSpec) DeepCopyInto(out *AlertmanagerSpec) {
 		(*in).DeepCopyInto(*out)
 	}
 	out.AlertmanagerConfigMatcherStrategy = in.AlertmanagerConfigMatcherStrategy
+	if in.AlertmanagerConfigFileSystemMode != nil {
+		in, out := &in.AlertmanagerConfigFileSystemMode, &out.AlertmanagerConfigFileSystemMode
+		*out = new(AlertmanagerConfigFileSystemMode)
+		**out = **in
+	}
 	if in.MinReadySeconds != nil {
 		in, out := &in.MinReadySeconds, &out.MinReadySeconds
 		*out = new(int32)
@@ -1141,6 +1146,11 @@ func (in *CommonPrometheusFields) DeepCopyInto(out *CommonPrometheusFields) {
 	}
 	if in.ScrapeClassicHistograms != nil {
 		in, out := &in.ScrapeClassicHistograms, &out.ScrapeClassicHistograms
+		*out = new(bool)
+		**out = **in
+	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
 		*out = new(bool)
 		**out = **in
 	}
@@ -2363,6 +2373,11 @@ func (in *PodMonitorSpec) DeepCopyInto(out *PodMonitorSpec) {
 		*out = new(ScrapeProtocol)
 		**out = **in
 	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
+		**out = **in
+	}
 	if in.LabelLimit != nil {
 		in, out := &in.LabelLimit, &out.LabelLimit
 		*out = new(int64)
@@ -2509,6 +2524,11 @@ func (in *ProbeSpec) DeepCopyInto(out *ProbeSpec) {
 	if in.FallbackScrapeProtocol != nil {
 		in, out := &in.FallbackScrapeProtocol, &out.FallbackScrapeProtocol
 		*out = new(ScrapeProtocol)
+		**out = **in
+	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
 		**out = **in
 	}
 	if in.LabelLimit != nil {
@@ -3638,6 +3658,11 @@ func (in *ServiceMonitorSpec) DeepCopyInto(out *ServiceMonitorSpec) {
 	if in.FallbackScrapeProtocol != nil {
 		in, out := &in.FallbackScrapeProtocol, &out.FallbackScrapeProtocol
 		*out = new(ScrapeProtocol)
+		**out = **in
+	}
+	if in.ExtraScrapeMetrics != nil {
+		in, out := &in.ExtraScrapeMetrics, &out.ExtraScrapeMetrics
+		*out = new(bool)
 		**out = **in
 	}
 	if in.TargetLimit != nil {

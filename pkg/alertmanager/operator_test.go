@@ -168,10 +168,10 @@ func TestCreateStatefulSetInputHash(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			a1Hash, err := createSSetInputHash(tc.a, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{})
+			a1Hash, err := createSSetInputHash(tc.a, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{}, "")
 			require.NoError(t, err)
 
-			a2Hash, err := createSSetInputHash(tc.b, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{})
+			a2Hash, err := createSSetInputHash(tc.b, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{}, "")
 			require.NoError(t, err)
 
 			if !tc.equal {
@@ -181,11 +181,37 @@ func TestCreateStatefulSetInputHash(t *testing.T) {
 
 			require.Equal(t, a1Hash, a2Hash, "expected two Alertmanager CRDs to produce the same hash but got different hash")
 
-			a2Hash, err = createSSetInputHash(tc.a, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{Replicas: new(int32(2))})
+			a2Hash, err = createSSetInputHash(tc.a, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{Replicas: new(int32(2))}, "")
 			require.NoError(t, err)
 
 			require.NotEqual(t, a1Hash, a2Hash, "expected same Alertmanager CRDs with different statefulset specs to produce different hashes but got equal hash")
 		})
+	}
+}
+
+func TestCreateStatefulSetInputHashClusterTLSConfig(t *testing.T) {
+	am := monitoringv1.Alertmanager{}
+	initialHash, err := createSSetInputHash(am, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{}, "123")
+	require.NoError(t, err)
+
+	sameHash, err := createSSetInputHash(am, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{}, "123")
+	require.NoError(t, err)
+	require.Equal(t, initialHash, sameHash)
+
+	changedHash, err := createSSetInputHash(am, Config{}, &operator.ShardedSecret{}, appsv1.StatefulSetSpec{}, "456")
+	require.NoError(t, err)
+	require.NotEqual(t, initialHash, changedHash)
+}
+
+// allowAllFileSystemAM returns an Alertmanager object whose filesystem mode
+// allows AlertmanagerConfig resources to reference the container's filesystem.
+// It is used by tests focusing on version-based validation so that the
+// filesystem access check doesn't interfere with them.
+func allowAllFileSystemAM() *monitoringv1.Alertmanager {
+	return &monitoringv1.Alertmanager{
+		Spec: monitoringv1.AlertmanagerSpec{
+			AlertmanagerConfigFileSystemMode: ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+		},
 	}
 }
 
@@ -216,6 +242,12 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 	version32, err := semver.ParseTolerant("v0.32.0")
 	require.NoError(t, err)
 
+	version33, err := semver.ParseTolerant("v0.33.0")
+	require.NoError(t, err)
+
+	version34, err := semver.ParseTolerant("v0.34.0")
+	require.NoError(t, err)
+
 	c := fake.NewClientset(
 		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -228,6 +260,7 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 				"invalid-url":          []byte("://foo"),
 				"invalid-template-url": []byte("{{ .labels.url"),
 				"token":                []byte("abc1243"),
+				"empty":                []byte(""),
 			},
 		},
 	)
@@ -369,6 +402,24 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 		{
 			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pagerduty-without-routing-key-and-service-key",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name:             "recv1",
+						PagerDutyConfigs: []monitoringv1alpha1.PagerDutyConfig{{}},
+					}},
+				},
+			},
+			ok: false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "missing-pagerduty-service-key",
 					Namespace: "ns1",
 				},
@@ -415,6 +466,29 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 		{
 			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "empty-pagerduty-service-key",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PagerDutyConfigs: []monitoringv1alpha1.PagerDutyConfig{{
+							ServiceKey: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "secret"},
+								Key:                  "empty",
+							},
+						}},
+					}},
+				},
+			},
+			ok: false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "missing-pagerduty-routing-key",
 					Namespace: "ns1",
 				},
@@ -457,6 +531,29 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 				},
 			},
 			ok: true,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "empty-pagerduty-routing-key",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PagerDutyConfigs: []monitoringv1alpha1.PagerDutyConfig{{
+							RoutingKey: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "secret"},
+								Key:                  "empty",
+							},
+						}},
+					}},
+				},
+			},
+			ok: false,
 		},
 		{
 			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
@@ -1213,6 +1310,56 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 		{
 			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
 				ObjectMeta: metav1.ObjectMeta{
+					Name:      "msteamsv2-with-valid-webhook-url-secret",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
+							{
+								WebhookURL: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "secret"},
+									Key:                  "key1",
+								},
+							},
+						},
+					}},
+				},
+			},
+			ok: true,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "msteamsv2-with-empty-webhook-url",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
+							{
+								WebhookURL: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "secret"},
+									Key:                  "empty",
+								},
+							},
+						},
+					}},
+				},
+			},
+			ok: false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      "email-config-with-implicit-tls",
 					Namespace: "ns1",
 				},
@@ -1400,6 +1547,202 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 			version: &version29,
 			ok:      false,
 		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-device-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKeyFile: new("/etc/pushover/user_key"),
+							TokenFile:   new("/etc/pushover/token"),
+							Device:      new("deviceone"),
+						}},
+					}},
+				},
+			},
+			version: &version26,
+			ok:      true,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-device-not-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKeyFile: new("/etc/pushover/user_key"),
+							TokenFile:   new("/etc/pushover/token"),
+							Device:      new("deviceone"),
+						}},
+					}},
+				},
+			},
+			version: &version25,
+			ok:      false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-user-key-file-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKeyFile: new("/etc/pushover/user_key"),
+							Token: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "secret",
+								},
+								Key: "token",
+							},
+						}},
+					}},
+				},
+			},
+			version: &version26,
+			ok:      true,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-user-key-file-not-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKeyFile: new("/etc/pushover/user_key"),
+							Token: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "secret",
+								},
+								Key: "token",
+							},
+						}},
+					}},
+				},
+			},
+			version: &version25,
+			ok:      false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-token-file-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKey: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "secret",
+								},
+								Key: "token",
+							},
+							TokenFile: new("/etc/pushover/token"),
+						}},
+					}},
+				},
+			},
+			version: &version26,
+			ok:      true,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pushover-config-token-file-not-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+						PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+							UserKey: &corev1.SecretKeySelector{
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "secret",
+								},
+								Key: "token",
+							},
+							TokenFile: new("/etc/pushover/token"),
+						}},
+					}},
+				},
+			},
+			version: &version25,
+			ok:      false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "route-labels-not-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+						Labels: []monitoringv1alpha1.KeyValue{
+							{Key: "env", Value: "production"},
+						},
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+					}},
+				},
+			},
+			version: &version33,
+			ok:      false,
+		},
+		{
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "route-labels-supported",
+					Namespace: "ns1",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "recv1",
+						Labels: []monitoringv1alpha1.KeyValue{
+							{Key: "env", Value: "production"},
+						},
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name: "recv1",
+					}},
+				},
+			},
+			version: &version34,
+			ok:      true,
+		},
 	} {
 		t.Run(tc.amConfig.Name, func(t *testing.T) {
 			store := assets.NewStoreBuilder(c.CoreV1(), c.CoreV1())
@@ -1408,7 +1751,7 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -1416,6 +1759,238 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 
 			t.Logf("err: %s", err)
 			require.Error(t, err)
+		})
+	}
+}
+
+func TestCheckAlertmanagerConfigFileSystemAccess(t *testing.T) {
+	version, err := semver.ParseTolerant("v0.26.0")
+	require.NoError(t, err)
+
+	store := assets.NewStoreBuilder(fake.NewClientset().CoreV1(), fake.NewClientset().CoreV1())
+
+	// withFileRef is an otherwise valid AlertmanagerConfig which references the
+	// Alertmanager container's filesystem (via the Telegram 'botTokenFile').
+	withFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "with-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+				TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+					BotTokenFile: new("/etc/secrets/token"),
+					ChatID:       1234,
+				}},
+			}},
+		},
+	}
+
+	// withoutFileRef is a valid AlertmanagerConfig with no filesystem reference.
+	withoutFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "without-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+			}},
+		},
+	}
+
+	// withPushoverFileRef is an otherwise valid AlertmanagerConfig which
+	// references the filesystem via the Pushover 'userKeyFile'/'tokenFile'.
+	withPushoverFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "with-pushover-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+				PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+					UserKeyFile: new("/etc/pushover/user_key"),
+					TokenFile:   new("/etc/pushover/token"),
+				}},
+			}},
+		},
+	}
+
+	newAM := func(mode *monitoringv1.AlertmanagerConfigFileSystemMode, strategy monitoringv1.AlertmanagerConfigMatcherStrategyType) *monitoringv1.Alertmanager {
+		return &monitoringv1.Alertmanager{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "am",
+				Namespace: "am-ns",
+			},
+			Spec: monitoringv1.AlertmanagerSpec{
+				AlertmanagerConfigFileSystemMode: mode,
+				AlertmanagerConfigMatcherStrategy: monitoringv1.AlertmanagerConfigMatcherStrategy{
+					Type: strategy,
+				},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		name     string
+		mode     *monitoringv1.AlertmanagerConfigFileSystemMode
+		strategy monitoringv1.AlertmanagerConfigMatcherStrategyType
+		amc      *monitoringv1alpha1.AlertmanagerConfig
+		wantErr  bool
+	}{
+		{
+			name:    "AllowAll allows telegram file reference",
+			mode:    ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+			amc:     withFileRef,
+			wantErr: false,
+		},
+		{
+			name:    "AllowAll allows pushover file reference",
+			mode:    ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+			amc:     withPushoverFileRef,
+			wantErr: false,
+		},
+		{
+			name:    "DenyAll denies telegram file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withFileRef,
+			wantErr: true,
+		},
+		{
+			name:    "DenyAll denies pushover file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withPushoverFileRef,
+			wantErr: true,
+		},
+		{
+			name:    "DenyAll accepts config without file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withoutFileRef,
+			wantErr: false,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with None allows",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.NoneConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  false,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with OnNamespace denies non-global",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.OnNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with OnNamespaceExcept denies other namespaces",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+		{
+			name:     "default mode is FromAlertmanagerConfigMatcherStrategy (OnNamespace) denying non-global",
+			mode:     nil,
+			strategy: monitoringv1.OnNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			am := newAM(tc.mode, tc.strategy)
+			err := checkAlertmanagerConfigResource(context.Background(), am, tc.amc, version, store)
+			if tc.wantErr {
+				require.Error(t, err)
+				// The failure must wrap the filesystem denial sentinel error.
+				require.ErrorIs(t, err, errFileSystemDenied)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+
+	t.Run("OnNamespaceExcept allows Alertmanager namespace", func(t *testing.T) {
+		am := newAM(ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode), monitoringv1.OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType)
+		amc := withFileRef.DeepCopy()
+		amc.Namespace = am.Namespace
+		require.NoError(t, checkAlertmanagerConfigResource(context.Background(), am, amc, version, store))
+	})
+}
+
+func TestCheckWebexAlertmanagerConfigEmptyCredentials(t *testing.T) {
+	version, err := semver.ParseTolerant(operator.DefaultAlertmanagerVersion)
+	require.NoError(t, err)
+
+	secret := corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "webex"},
+		Key:                  "token",
+	}
+	emptySecret := secret
+	emptySecret.Key = "empty"
+
+	for _, tc := range []struct {
+		name       string
+		httpConfig *monitoringv1alpha1.HTTPConfig
+		expectErr  bool
+	}{
+		{
+			name: "authorization",
+			httpConfig: &monitoringv1alpha1.HTTPConfig{
+				Authorization: &monitoringv1.SafeAuthorization{Credentials: &secret},
+			},
+		},
+		{
+			name:       "bearerTokenSecret",
+			httpConfig: &monitoringv1alpha1.HTTPConfig{BearerTokenSecret: &secret},
+		},
+		{
+			name: "empty authorization credentials",
+			httpConfig: &monitoringv1alpha1.HTTPConfig{
+				Authorization: &monitoringv1.SafeAuthorization{Credentials: &emptySecret},
+			},
+			expectErr: true,
+		},
+		{
+			name:       "empty bearerTokenSecret",
+			httpConfig: &monitoringv1alpha1.HTTPConfig{BearerTokenSecret: &emptySecret},
+			expectErr:  true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := fake.NewClientset(&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: "webex", Namespace: "ns1"},
+				Data:       map[string][]byte{"token": []byte("webex-token"), "empty": {}},
+			})
+			store := assets.NewStoreBuilder(c.CoreV1(), c.CoreV1())
+
+			config := &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name:         "webex",
+						WebexConfigs: []monitoringv1alpha1.WebexConfig{{RoomID: "room-1", HTTPConfig: tc.httpConfig}},
+					}},
+				},
+			}
+
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), config, version, store)
+			if tc.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1567,7 +2142,7 @@ func TestCheckOpsGenieAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -1710,7 +2285,7 @@ func TestCheckDiscordAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -2048,7 +2623,7 @@ func TestCheckWebhookAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return

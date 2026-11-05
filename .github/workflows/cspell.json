@@ -434,7 +434,8 @@
     "nodev",
     "nosuid",
     "amtool",
-    "mcbenjemaa",
-    "coffeegoesincodecomesout"
+    "coffeegoesincodecomesout",
+    "distroless",
+    "mcbenjemaa"
   ]
 }

@@ -1,9 +1,9 @@
 module github.com/prometheus-operator/prometheus-operator
 
-go 1.26.0
+go 1.26.10
 
 require (
-	github.com/KimMachineGun/automemlimit v1.0.0
+	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
@@ -12,34 +12,34 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-kit/log v0.2.1
-	github.com/go-test/deep v1.1.1
+	github.com/go-test/deep v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.7.0
 	github.com/kylelemons/godebug v1.1.0
 	github.com/mitchellh/hashstructure v1.1.0
 	github.com/oklog/run v1.2.0
-	github.com/prometheus-community/prom-label-proxy v0.15.1
-	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.94.1
-	github.com/prometheus-operator/prometheus-operator/pkg/client v0.94.1
-	github.com/prometheus/alertmanager v0.34.1
-	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/common v0.72.0
+	github.com/prometheus-community/prom-label-proxy v0.16.0
+	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.95.1
+	github.com/prometheus-operator/prometheus-operator/pkg/client v0.95.1
+	github.com/prometheus/alertmanager v0.34.2
+	github.com/prometheus/client_golang v1.25.0
+	github.com/prometheus/common v0.73.1
 	github.com/prometheus/exporter-toolkit v0.20.0
-	github.com/prometheus/prometheus v0.315.0
+	github.com/prometheus/prometheus v0.315.1
 	github.com/stretchr/testify v1.12.1
-	github.com/thanos-io/thanos v0.42.4
-	golang.org/x/net v0.59.0
-	golang.org/x/sync v0.23.0
+	github.com/thanos-io/thanos v0.42.5
+	golang.org/x/net v0.62.0
+	golang.org/x/sync v0.24.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.37.1
-	k8s.io/apiextensions-apiserver v0.37.1
-	k8s.io/apimachinery v0.37.1
-	k8s.io/apiserver v0.37.1
-	k8s.io/client-go v0.37.1
-	k8s.io/component-base v0.37.1
+	k8s.io/api v0.37.2
+	k8s.io/apiextensions-apiserver v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/apiserver v0.37.2
+	k8s.io/client-go v0.37.2
+	k8s.io/component-base v0.37.2
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
+	k8s.io/utils v0.0.0-20261023123148-ca04ba58ecab
 	sigs.k8s.io/controller-runtime v0.25.2
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -66,18 +66,18 @@ require (
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
-	github.com/go-openapi/runtime/server-middleware v0.33.1 // indirect
+	github.com/go-openapi/runtime/server-middleware v0.33.3 // indirect
 	github.com/go-openapi/swag v0.29.1 // indirect
 	github.com/go-openapi/swag/cmdutils v0.29.1 // indirect
-	github.com/go-openapi/swag/conv v0.29.1 // indirect
-	github.com/go-openapi/swag/fileutils v0.29.1 // indirect
-	github.com/go-openapi/swag/jsonutils v0.29.1 // indirect
+	github.com/go-openapi/swag/conv v0.29.2 // indirect
+	github.com/go-openapi/swag/fileutils v0.29.2 // indirect
+	github.com/go-openapi/swag/jsonutils v0.29.2 // indirect
 	github.com/go-openapi/swag/loading v0.29.1 // indirect
 	github.com/go-openapi/swag/mangling v0.29.1 // indirect
 	github.com/go-openapi/swag/netutils v0.29.1 // indirect
-	github.com/go-openapi/swag/pools v0.29.1 // indirect
-	github.com/go-openapi/swag/stringutils v0.29.1 // indirect
-	github.com/go-openapi/swag/typeutils v0.29.1 // indirect
+	github.com/go-openapi/swag/pools v0.29.2 // indirect
+	github.com/go-openapi/swag/stringutils v0.29.2 // indirect
+	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
 	github.com/go-openapi/swag/yamlutils v0.29.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
@@ -91,15 +91,17 @@ require (
 	github.com/hashicorp/go-msgpack/v2 v2.1.5 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
+	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/memberlist v0.6.0 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/mdlayher/socket v0.6.0 // indirect
 	github.com/mdlayher/vsock v1.3.0 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
+	github.com/pandatix/go-abnf v0.5.3 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -125,7 +127,7 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/telebot.v3 v3.3.8 // indirect
-	k8s.io/streaming v0.37.1 // indirect
+	k8s.io/streaming v0.37.2 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
@@ -141,15 +143,15 @@ require (
 	github.com/go-logfmt/logfmt v0.6.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/analysis v0.26.2 // indirect
-	github.com/go-openapi/errors v0.22.8 // indirect
-	github.com/go-openapi/jsonpointer v1.0.0 // indirect
-	github.com/go-openapi/jsonreference v1.0.1 // indirect
-	github.com/go-openapi/loads v0.25.2 // indirect
-	github.com/go-openapi/runtime v0.33.1 // indirect
-	github.com/go-openapi/spec v0.22.11 // indirect
-	github.com/go-openapi/strfmt v0.27.2 // indirect
-	github.com/go-openapi/validate v0.26.5 // indirect
+	github.com/go-openapi/analysis v1.0.0 // indirect
+	github.com/go-openapi/errors v0.22.9 // indirect
+	github.com/go-openapi/jsonpointer v1.0.1 // indirect
+	github.com/go-openapi/jsonreference v1.0.2 // indirect
+	github.com/go-openapi/loads v0.25.3 // indirect
+	github.com/go-openapi/runtime v0.33.3 // indirect
+	github.com/go-openapi/spec v1.0.1 // indirect
+	github.com/go-openapi/strfmt v0.27.3 // indirect
+	github.com/go-openapi/validate v1.0.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/grafana/regexp v0.0.0-20250905093917-f7b3be9d1853 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -174,11 +176,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gotest.tools/v3 v3.5.2

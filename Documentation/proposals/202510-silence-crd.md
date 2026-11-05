@@ -232,12 +232,12 @@ The operator's write path reaches only the Kubernetes API (to read and write the
 
 **Operator (Secret write) failures:**
 
-| Situation                                           | `reason`                     | Retry               |
-|-----------------------------------------------------|------------------------------|---------------------|
-| Secret written successfully                         | `SecretWritten`              | — (`Accepted=True`) |
-| Kubernetes API unreachable or returning 5xx         | `SecretWriteFailed`          | backoff             |
-| RBAC denies the operator write access to the Secret | `SecretWriteDenied`          | none                |
-| Effective `endsAt` already passed                   | `SilenceExpired`             | none                |
+| Situation                                           | `reason`            | Retry               |
+|-----------------------------------------------------|---------------------|---------------------|
+| Secret written successfully                         | `SecretWritten`     | — (`Accepted=True`) |
+| Kubernetes API unreachable or returning 5xx         | `SecretWriteFailed` | backoff             |
+| RBAC denies the operator write access to the Secret | `SecretWriteDenied` | none                |
+| Effective `endsAt` already passed                   | `SilenceExpired`    | none                |
 
 Retryable failures are requeued with the workqueue's exponential backoff. The rest are not: the fix is a change to the Silence or the Alertmanager resource. They are still re-attempted on the ordinary resync and whenever either resource changes, so a corrected configuration recovers without the controller tracking what it gave up on.
 

@@ -405,8 +405,8 @@ The version check is not part of the startup pre-flight. The operator manages th
 
 ### Testing and Verification
 
-* Unit tests for the reconcile loop, Secret write logic, and status updates (inline with implementation tasks).
-* Unit tests for namespace matcher injection across all three `alertmanagerConfigMatcherStrategy` values.
+* Unit tests for helper functions: namespace matcher injection logic across all three `alertmanagerConfigMatcherStrategy` values, timing field resolution (`startsAt` / `endsAt` / `duration`), and Secret JSON serialization.
+* Integration tests for the reconcile loop: the full controller logic (informer interactions, selector resolution, Secret write, status updates) is tested at the e2e level due to the many Kubernetes component interactions involved.
 * E2e tests against a real Alertmanager >= 0.32.0: create a Silence → verify the silence appears in Alertmanager with the `monitoring.coreos.com/silence-uid` annotation; delete the Silence → verify the silence is eventually deleted from Alertmanager.
 * E2e test for namespace isolation: verify `namespace=<ns>` matcher is injected under `OnNamespace`, absent for a Silence in the AM namespace under `OnNamespaceExceptForAlertmanagerNamespace`, and absent under `None`.
 * E2e tests for drift correction: edit a managed silence's `comment` through the Alertmanager API → verify the sidecar's next reconcile restores it; delete the silence through the UI → verify the sidecar recreates it.

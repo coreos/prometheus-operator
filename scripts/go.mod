@@ -13,7 +13,7 @@ require (
 	github.com/simonpasquier/metrics-gen v0.0.0-20260724132104-20228c8d995c
 	github.com/yeya24/promlinter v0.3.0
 	k8s.io/code-generator v0.37.2
-	sigs.k8s.io/controller-tools v0.22.0
+	sigs.k8s.io/controller-tools v0.23.0
 )
 
 require (

@@ -184,7 +184,6 @@ A dedicated `SilenceReconciler`, separate from the existing Alertmanager control
 2. On Silence change: resolves target Alertmanager resources via `silenceSelector` / `silenceNamespaceSelector`.
 3. For each target Alertmanager resource: rebuilds `silences.json` in full from the informer cache — all active, non-expired Silences that select this Alertmanager, with namespace matchers injected (see [Namespace Isolation](#namespace-isolation)) and timing resolved to absolute RFC3339 — and writes it as the Secret. A full rebuild per reconcile avoids the read-modify-write race when two Silence CRs targeting the same Alertmanager are reconciled concurrently.
 4. On Silence deletion: removes the silence's entry from each Alertmanager's Secret. The sidecar's next reconcile detects the orphan and deletes it from Alertmanager. No finalizer is required.
-5. Periodic reconcile on the informer resync, correcting any Secret divergence.
 
 No finalizer is needed on the Silence resource. When the Silence CR is deleted, the operator removes its entry from each Secret; when the Alertmanager CR changes or is deleted, the operator reconciles or removes the Secret accordingly. Cleanup of the actual Alertmanager API silence is delegated to the sidecar.
 
@@ -199,6 +198,7 @@ The Secret holds a JSON document under the key `silences.json`:
   "silences": [
     {
       "uid": "<Silence CR UID>",
+      "generation": 3,
       "name": "<Silence CR name>",
       "namespace": "<Silence CR namespace>",
       "matchers": [
@@ -237,7 +237,6 @@ The operator's write path reaches only the Kubernetes API (to read and write the
 | Secret written successfully                         | `SecretWritten`              | — (`Accepted=True`) |
 | Kubernetes API unreachable or returning 5xx         | `SecretWriteFailed`          | backoff             |
 | RBAC denies the operator write access to the Secret | `SecretWriteDenied`          | none                |
-| `spec.listenLocal` leaves no reachable address      | `AlertmanagerNotAddressable` | none                |
 | Effective `endsAt` already passed                   | `SilenceExpired`             | none                |
 
 Retryable failures are requeued with the workqueue's exponential backoff. The rest are not: the fix is a change to the Silence or the Alertmanager resource. They are still re-attempted on the ordinary resync and whenever either resource changes, so a corrected configuration recovers without the controller tracking what it gave up on.
@@ -273,8 +272,8 @@ The sidecar reconciles on two triggers: process start, and whenever the mounted 
 1. Read and unmarshal `silences.json` from the mounted path. If the file is absent or empty, treat it as an empty list (all operator-managed silences should be deleted).
 2. List all Alertmanager silences carrying the `monitoring.coreos.com/silence-uid` annotation.
 3. For each entry in the file: look up the Alertmanager silence by annotation UID.
-   - If **absent**: create a new silence, setting the annotation to the entry's `uid`.
-   - If **present but different**: update the silence.
+   - If **absent**: create a new silence, setting the annotation to the entry's `uid` and storing the entry's `generation` in the silence's comment metadata.
+   - If **present but different**: check the generation. If the AM silence was created from a newer generation than the file entry, skip the update (stale Secret content). Otherwise, update the silence.
    - If **matching**: no write.
 4. **Orphan pass**: delete any Alertmanager silence whose `monitoring.coreos.com/silence-uid` annotation does not appear in the file. This handles Silence CR deletion without requiring a finalizer on the Kubernetes resource.
 
@@ -286,7 +285,7 @@ The sidecar exposes a Prometheus metrics endpoint. Key metrics:
 
 | Metric                                        | Labels                                                 | Description                                     |
 |-----------------------------------------------|--------------------------------------------------------|-------------------------------------------------|
-| `silence_sidecar_reconcile_total`             | `result="success"` or `result="error"`                 | Total reconcile attempts and their outcome      |
+| `silence_sidecar_reconcile_total`             | —                                                      | Total reconcile attempts                        |
 | `silence_sidecar_sync_errors_total`           | `reason="unauthorized"`, `"unreachable"`, `"rejected"` | Breakdown of Alertmanager API failures          |
 | `silence_sidecar_last_sync_timestamp_seconds` | —                                                      | Unix timestamp of the last successful reconcile |
 
@@ -408,12 +407,11 @@ The version check is not part of the startup pre-flight. The operator manages th
 
 * Unit tests for the reconcile loop, Secret write logic, and status updates (inline with implementation tasks).
 * Unit tests for namespace matcher injection across all three `alertmanagerConfigMatcherStrategy` values.
-* E2e tests against a real Alertmanager >= 0.32.0: create a Silence → verify the Secret is written with correct content and the silence appears in Alertmanager with the `monitoring.coreos.com/silence-uid` annotation; delete the Silence → verify its entry is removed from the Secret and the silence is eventually deleted from Alertmanager.
+* E2e tests against a real Alertmanager >= 0.32.0: create a Silence → verify the silence appears in Alertmanager with the `monitoring.coreos.com/silence-uid` annotation; delete the Silence → verify the silence is eventually deleted from Alertmanager.
 * E2e test for namespace isolation: verify `namespace=<ns>` matcher is injected under `OnNamespace`, absent for a Silence in the AM namespace under `OnNamespaceExceptForAlertmanagerNamespace`, and absent under `None`.
 * E2e tests for drift correction: edit a managed silence's `comment` through the Alertmanager API → verify the sidecar's next reconcile restores it; delete the silence through the UI → verify the sidecar recreates it.
 * E2e test for orphan cleanup: delete a Silence CR → verify the sidecar removes the corresponding Alertmanager silence within one reconcile cycle.
 * E2e test for coexistence: create a silence directly through the Alertmanager API without the annotation → verify the sidecar leaves it untouched across reconciles.
-* E2e test for failure reporting: point a Silence at an Alertmanager with `spec.listenLocal: true` → verify `Accepted=False` with `AlertmanagerNotAddressable`.
 * Sidecar convergence metrics and alerting rules verified in the e2e environment.
 
 ## Alternatives

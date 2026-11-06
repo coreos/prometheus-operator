@@ -242,8 +242,8 @@ github.com/go-openapi/runtime/server-middleware v0.33.3 h1:Td5UBla/J/KCjlsD0tmZY
 github.com/go-openapi/runtime/server-middleware v0.33.3/go.mod h1:dopwrwqIqXe4xWtovDZkkXJzYqKw+Ybmy7G/hIDUWKY=
 github.com/go-openapi/spec v1.0.1 h1:lj2vdGpNDcVgwRc6qXdw6qt/KQpCtSa9tnUH6vpDPDk=
 github.com/go-openapi/spec v1.0.1/go.mod h1:M//GWQGtDUAjnP37gE6fInLgaczB+FatoipV3H1fYw8=
-github.com/go-openapi/strfmt v0.27.3 h1:cyf4J5Wjpd6bFpAs44MF8PsbWF/mWXhn82Ck/hgQZgw=
-github.com/go-openapi/strfmt v0.27.3/go.mod h1:Bl+xadPLa3nhBiaCAxNND1vrQfzyEjF0vBrLx96n/4E=
+github.com/go-openapi/strfmt v0.27.4 h1:E1xsvHb8R9vsuYru4TP2PVVTv9AIgSFAUACUZrFQfCI=
+github.com/go-openapi/strfmt v0.27.4/go.mod h1:SCOff81PPhU26acBiW96jHaFycEbT2nkQRvojM+V2z0=
 github.com/go-openapi/swag v0.29.1 h1:C6EeWzUwQtcWEhE9eqBdUubGXxhWY4PlzHMLD7kLaiQ=
 github.com/go-openapi/swag v0.29.1/go.mod h1:BzxEXKiPlSXRsRTv1KSBF/BpGKHxA/YciCnr4tv9bvA=
 github.com/go-openapi/swag/cmdutils v0.29.1 h1:3DorPGfUdE80BogKY22EzoHBcHMrkVomZMoV7kS4ANY=
@@ -573,8 +573,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
 github.com/posener/complete v1.2.3/go.mod h1:WZIdtGGp+qx0sLrYKtIRAruyNpv6hFCicSgv7Sy7s/s=
-github.com/prometheus-community/prom-label-proxy v0.16.0 h1:GyHIr6YJ4FYY9K+8eaJoaFSTgnf65RLSajzSyj4DI2c=
-github.com/prometheus-community/prom-label-proxy v0.16.0/go.mod h1:yzvKap5MHUhBE3JZoTiQoBLBNcfCaDj01cCrQEp23pQ=
+github.com/prometheus-community/prom-label-proxy v0.16.1 h1:4cjrAbmsgYOm4ejNmTSgCsOBj+vS728Da7FKeOb6G/Q=
+github.com/prometheus-community/prom-label-proxy v0.16.1/go.mod h1:qw3R0icL2I7LNJ8koD4tbb9yUCpG8ll1uBfkV4R+ifA=
 github.com/prometheus/alertmanager v0.34.2 h1:4oOnHs4J41X9n+7MucFjA3I5i5MtasjWTnIY27q5Qkw=
 github.com/prometheus/alertmanager v0.34.2/go.mod h1:ikoahDowHeCtaEQGeHVxtyuPXw09UAN3H7vGhZEoXDM=
 github.com/prometheus/client_golang v0.9.1/go.mod h1:7SWBe2y4D6OKWSNQJUaRYU/AaXPKyh/dDVn+NZz0KFw=

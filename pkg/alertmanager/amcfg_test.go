@@ -4190,6 +4190,9 @@ func TestGenerateConfigOpsgenieReceiver(t *testing.T) {
 		expectedError   bool
 	}
 
+	version24, err := semver.ParseTolerant("v0.24.0")
+	require.NoError(t, err)
+
 	testCases := []testCase{
 		{
 			name: "CR with Opsgenie Receiver",
@@ -4424,6 +4427,84 @@ func TestGenerateConfigOpsgenieReceiver(t *testing.T) {
 				},
 			},
 			golden: "CR_with_Opsgenie_Details.golden",
+		},
+		{
+			name:      "CR with Opsgenie All Fields",
+			amVersion: &version24,
+			kclient: fake.NewClientset(
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "am-og-test-receiver",
+						Namespace: "mynamespace",
+					},
+					Data: map[string][]byte{
+						"apiKey": []byte("1234abc"),
+					},
+				},
+			),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							OpsGenieConfigs: []monitoringv1alpha1.OpsGenieConfig{{
+								SendResolved: new(true),
+								APIKey: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "am-og-test-receiver",
+									},
+									Key: "apiKey",
+								},
+								APIURL:       ptr.To(monitoringv1alpha1.URL("https://example.com/")),
+								Message:      new("test message"),
+								Description:  new("test description"),
+								Source:       new("test source"),
+								Tags:         new("tag1,tag2"),
+								Note:         new("test note"),
+								Priority:     new("P1"),
+								UpdateAlerts: new(true),
+								Details: []monitoringv1alpha1.KeyValue{
+									{Key: "foo", Value: "bar"},
+								},
+								Responders: []monitoringv1alpha1.OpsGenieConfigResponder{
+									{
+										ID:   new("abcde12345"),
+										Type: "team",
+									},
+									{
+										Name: new("myschedule"),
+										Type: "schedule",
+									},
+									{
+										Username: new("myuser"),
+										Type:     "user",
+									},
+									{
+										Name: new("myteams"),
+										Type: "teams",
+									},
+								},
+								Entity:  new("test entity"),
+								Actions: new("action1,action2"),
+							}},
+						}},
+					},
+				},
+			},
+			golden: "CR_with_Opsgenie_All_Fields.golden",
 		},
 	}
 

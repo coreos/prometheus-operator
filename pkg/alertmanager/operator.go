@@ -1179,7 +1179,7 @@ func (c *Operator) selectAlertmanagerConfigs(ctx context.Context, am *monitoring
 	eventRecorder := c.newEventRecorder(am)
 	for namespaceAndName, amc := range amConfigs {
 		var reason string
-		err := checkAlertmanagerConfigResource(ctx, amc, amVersion, store)
+		err := checkAlertmanagerConfigResource(ctx, am, amc, amVersion, store)
 		if err != nil {
 			rejected++
 			reason = operator.InvalidConfiguration
@@ -1207,11 +1207,81 @@ func (c *Operator) selectAlertmanagerConfigs(ctx context.Context, am *monitoring
 	return res, nil
 }
 
+// isGlobalAlertmanagerConfig returns true when the AlertmanagerConfig object is
+// the one referenced by `.spec.alertmanagerConfiguration`.
+func isGlobalAlertmanagerConfig(am *monitoringv1.Alertmanager, amc *monitoringv1alpha1.AlertmanagerConfig) bool {
+	return am.Spec.AlertmanagerConfiguration != nil &&
+		amc.GetNamespace() == am.GetNamespace() &&
+		amc.GetName() == am.Spec.AlertmanagerConfiguration.Name
+}
+
+// denyAlertmanagerConfigFileSystemAccess returns true when the given
+// AlertmanagerConfig object isn't allowed to reference files from the
+// Alertmanager container's filesystem.
+func denyAlertmanagerConfigFileSystemAccess(am *monitoringv1.Alertmanager, amc *monitoringv1alpha1.AlertmanagerConfig) bool {
+	switch ptr.Deref(am.Spec.AlertmanagerConfigFileSystemMode, "") {
+	case monitoringv1.AllowAllAlertmanagerConfigFileSystemMode:
+		return false
+	case monitoringv1.DenyAllAlertmanagerConfigFileSystemMode:
+		return true
+	default: // FromAlertmanagerConfigMatcherStrategy
+		switch am.Spec.AlertmanagerConfigMatcherStrategy.Type {
+		case monitoringv1.NoneConfigMatcherStrategyType:
+			// All AlertmanagerConfig resources process every incoming alert,
+			// filesystem references are allowed.
+			return false
+		case monitoringv1.OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType:
+			// Only AlertmanagerConfig resources located in the Alertmanager's
+			// namespace are allowed to reference the filesystem.
+			return amc.GetNamespace() != am.GetNamespace()
+		default: // OnNamespace (default)
+			// Only the global AlertmanagerConfig resource is allowed to
+			// reference the filesystem.
+			return !isGlobalAlertmanagerConfig(am, amc)
+		}
+	}
+}
+
+var errFileSystemDenied = errors.New("it accesses the filesystem which the Alertmanager specification prohibits")
+
+// checkAlertmanagerConfigFileSystemAccess returns an error if the
+// AlertmanagerConfig object references files from the Alertmanager container's
+// filesystem while the Alertmanager's filesystem mode denies it.
+func checkAlertmanagerConfigFileSystemAccess(am *monitoringv1.Alertmanager, amc *monitoringv1alpha1.AlertmanagerConfig) error {
+	if !denyAlertmanagerConfigFileSystemAccess(am, amc) {
+		return nil
+	}
+
+	for _, receiver := range amc.Spec.Receivers {
+		for i, config := range receiver.PushoverConfigs {
+			if ptr.Deref(config.UserKeyFile, "") != "" {
+				return fmt.Errorf("receiver %q: pushoverConfigs[%d]: userKeyFile: %w", receiver.Name, i, errFileSystemDenied)
+			}
+			if ptr.Deref(config.TokenFile, "") != "" {
+				return fmt.Errorf("receiver %q: pushoverConfigs[%d]: tokenFile: %w", receiver.Name, i, errFileSystemDenied)
+			}
+		}
+		for i, config := range receiver.TelegramConfigs {
+			if ptr.Deref(config.BotTokenFile, "") != "" {
+				return fmt.Errorf("receiver %q: telegramConfigs[%d]: botTokenFile: %w", receiver.Name, i, errFileSystemDenied)
+			}
+		}
+	}
+
+	return nil
+}
+
 // checkAlertmanagerConfigResource verifies that an AlertmanagerConfig object is valid
 // for the given Alertmanager version and has no missing references to other objects.
-func checkAlertmanagerConfigResource(ctx context.Context, amc *monitoringv1alpha1.AlertmanagerConfig, amVersion semver.Version, store *assets.StoreBuilder) error {
+func checkAlertmanagerConfigResource(ctx context.Context, am *monitoringv1.Alertmanager, amc *monitoringv1alpha1.AlertmanagerConfig, amVersion semver.Version, store *assets.StoreBuilder) error {
 	// Perform semantic validation irrespective of the Alertmanager version.
 	if err := validationv1alpha1.ValidateAlertmanagerConfig(amc); err != nil {
+		return err
+	}
+
+	// Reject AlertmanagerConfig objects referencing the container's filesystem
+	// when the configured filesystem mode doesn't allow it.
+	if err := checkAlertmanagerConfigFileSystemAccess(am, amc); err != nil {
 		return err
 	}
 
@@ -1420,6 +1490,10 @@ func checkOpsGenieConfigs(
 		}
 		if err := checkOpsGenieResponder(config.Responders, amVersion); err != nil {
 			return err
+		}
+
+		if config.UpdateAlerts != nil && amVersion.LT(semver.MustParse("0.24.0")) {
+			return fmt.Errorf(`'updateAlerts' is available in Alertmanager >= 0.24.0 only - current %s`, amVersion)
 		}
 
 		if config.APIKey != nil {

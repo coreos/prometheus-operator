@@ -522,6 +522,56 @@ func TestMakeStatefulSetSpecWebConcurrency(t *testing.T) {
 	}
 }
 
+func TestMakeStatefulSetSpecWebCORSOrigin(t *testing.T) {
+	tt := []struct {
+		scenario           string
+		version            string
+		web                *monitoringv1.AlertmanagerWebSpec
+		expectCORSOrigin   bool
+		expectCORSArgValue string
+	}{{
+		scenario:         "no cors origin by default",
+		version:          "v0.34.2",
+		web:              nil,
+		expectCORSOrigin: false,
+	}, {
+		scenario: "no cors origin for old version",
+		version:  "v0.34.1",
+		web: &monitoringv1.AlertmanagerWebSpec{
+			CORSOrigin: new(string(`https://example\.com`)),
+		},
+		expectCORSOrigin: false,
+	}, {
+		scenario: "cors origin arg set if specified",
+		version:  "v0.34.2",
+		web: &monitoringv1.AlertmanagerWebSpec{
+			CORSOrigin: new(string(`https://example\.com`)),
+		},
+		expectCORSOrigin:   true,
+		expectCORSArgValue: `--web.cors.origin=https://example\.com`,
+	}}
+
+	for _, ts := range tt {
+		t.Run(ts.scenario, func(t *testing.T) {
+			a := monitoringv1.Alertmanager{}
+			a.Spec.Replicas = new(int32(1))
+
+			a.Spec.Version = ts.version
+			a.Spec.Web = ts.web
+
+			ss, err := makeStatefulSetSpec(nil, &a, defaultTestConfig, "", &operator.ShardedSecret{})
+			require.NoError(t, err)
+
+			args := ss.Template.Spec.Containers[0].Args
+			got := slices.ContainsFunc(args, containsString("-web.cors.origin"))
+			require.Equal(t, ts.expectCORSOrigin, got, "expected alertmanager args %v web.cors.origin to be %v but is %v", args, ts.expectCORSOrigin, got)
+			if ts.expectCORSOrigin {
+				require.Contains(t, args, ts.expectCORSArgValue)
+			}
+		})
+	}
+}
+
 func TestMakeStatefulSetSpecMaxSilences(t *testing.T) {
 	tt := []struct {
 		scenario             string

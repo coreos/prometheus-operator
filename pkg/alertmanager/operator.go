@@ -1492,6 +1492,10 @@ func checkOpsGenieConfigs(
 			return err
 		}
 
+		if config.UpdateAlerts != nil && amVersion.LT(semver.MustParse("0.24.0")) {
+			return fmt.Errorf(`'updateAlerts' is available in Alertmanager >= 0.24.0 only - current %s`, amVersion)
+		}
+
 		if config.APIKey != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.APIKey); err != nil {
 				return err

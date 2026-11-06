@@ -119,6 +119,12 @@ var (
 		"v3.13.4",
 		"v3.13.5",
 		"v3.14.0",
+		// Notice: v3.15.x built with Go 1.27 lose HTTP/2 ALPN negotiation over
+		// TLS and fall back to HTTP/1.1, fixed in v3.16.0.
+		// See https://github.com/prometheus/prometheus/issues/19807
+		"v3.15.0",
+		"v3.15.1",
+		"v3.16.0",
 	}
 )
 

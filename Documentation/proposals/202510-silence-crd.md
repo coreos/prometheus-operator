@@ -442,7 +442,7 @@ An alternative is to **assign each silence to a specific pod** — for example, 
 
 2. **Pod churn.** When replicas scale up or down, or a pod is evicted and replaced, the hash-to-pod mapping changes. Silences would need to be reassigned, which either requires coordination (complex) or results in temporarily duplicated work during the transition.
 
-3. **Generation tracking is sufficient.** The `generation` field added to each Secret entry prevents stale writes: if a sidecar's mounted Secret is outdated and another sidecar has already updated the silence to a newer generation, the stale sidecar skips the write. This makes the brute-force approach safe even when Secret propagation to different pods is slightly skewed.
+3. **Generation tracking is sufficient.** The `generation` field added to each Secret entry prevents stale writes in edge cases: if a pod is restarting during a Secret update, or if a sidecar's filesystem watch has brief lag, generation tracking ensures the stale content doesn't overwrite a silence already updated by another pod's sidecar. With the pod nudge mechanism, all pods receive the Secret update nearly simultaneously, so routine propagation skew is not a concern.
 
 4. **Simplicity.** The brute-force approach has no special cases. Every sidecar does the same thing, and the outcome is correct whether zero, one, or all of them succeed. Distribution introduces conditional logic (am I the owner of this silence?), failure detection (is the owner pod healthy?), and handoff (reassign on scale or failure).
 
@@ -520,7 +520,7 @@ The feature gate lands first so that every subsequent step can merge incremental
 
   <gh issue="">
 
-* [ ] Implement `SilenceReconciler`: reconcile Silence CRs into per-Alertmanager Secrets, including selector resolution via the namespace informer (with unit tests)
+* [ ] Implement `SilenceReconciler`: reconcile Silence CRs into per-Alertmanager Secrets, update Alertmanager pod annotations to trigger immediate kubelet remount, and handle selector resolution via the namespace informer (with unit tests)
 
   <gh issue="">
 

@@ -16,7 +16,6 @@ package alertmanager
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"testing"
@@ -41,10 +40,6 @@ import (
 	monitoringfake "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/fake"
 	"github.com/prometheus-operator/prometheus-operator/pkg/operator"
 )
-
-func commonFieldErrorMessage(fieldName, expectedVersion, currentVersion string) error {
-	return fmt.Errorf("%w: '%s' is available in Alertmanager >= %s only - current %s", ErrFieldNotAvailable, fieldName, expectedVersion, currentVersion)
-}
 
 func TestCreateStatefulSetInputHash(t *testing.T) {
 	falseVal := false
@@ -2468,7 +2463,7 @@ func TestCheckSNSAlertmanagerConfig(t *testing.T) {
 		amConfig *monitoringv1alpha1.AlertmanagerConfig
 		version  *semver.Version
 		ok       bool
-		errMsg   error
+		errMsg   *string
 	}{
 		{
 			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
@@ -2569,7 +2564,7 @@ func TestCheckSNSAlertmanagerConfig(t *testing.T) {
 			},
 			version: &version32,
 			ok:      false,
-			errMsg:  commonFieldErrorMessage("useAWSHTTPClient", "0.33.0", version32.String()),
+			errMsg:  new("'useAWSHTTPClient' is available in Alertmanager >= 0.33.0 only - current 0.32.0"),
 		},
 	} {
 		t.Run(tc.amConfig.Name, func(t *testing.T) {
@@ -2587,7 +2582,7 @@ func TestCheckSNSAlertmanagerConfig(t *testing.T) {
 
 			t.Logf("err: %s", err)
 			if tc.errMsg != nil {
-				assert.EqualError(t, err, tc.errMsg.Error())
+				assert.EqualError(t, err, *tc.errMsg)
 				return
 			}
 			require.Error(t, err)

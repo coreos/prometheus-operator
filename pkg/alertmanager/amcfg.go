@@ -3328,6 +3328,9 @@ func (rc *rocketChatConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	}
 
 	v := func(u urlStruct) error {
+		if u.URL == "" {
+			return nil
+		}
 		if err := validation.ValidateTemplateURL(u.URL); err != nil {
 			return fmt.Errorf("invalid '%s': %w", u.FieldName, err)
 		}

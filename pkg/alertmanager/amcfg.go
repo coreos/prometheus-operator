@@ -3310,10 +3310,10 @@ func (rc *rocketChatConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	}
 
 	if rc.Token != nil && len(rc.TokenFile) > 0 {
-		return fmt.Errorf("at most one of token & token_file must be configured")
+		return fmt.Errorf("at most one of 'token' & 'token_file' must be configured")
 	}
 	if rc.TokenID != nil && len(rc.TokenIDFile) > 0 {
-		return fmt.Errorf("at most one of token_id & token_id_file must be configured")
+		return fmt.Errorf("at most one of 'token_id' & 'token_id_file' must be configured")
 	}
 
 	if rc.APIURL != "" {

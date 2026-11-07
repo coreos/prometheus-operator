@@ -3316,20 +3316,25 @@ func (rc *rocketChatConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 		return fmt.Errorf("at most one of token_id & token_id_file must be configured")
 	}
 
+	if rc.APIURL != "" {
+		if _, err := validation.ValidateURL(rc.APIURL); err != nil {
+			return fmt.Errorf("invalid 'api_url': %w", err)
+		}
+	}
+
 	type urlStruct struct {
 		URL       string
 		FieldName string
 	}
 
 	v := func(u urlStruct) error {
-		if _, err := validation.ValidateURL(u.URL); err != nil {
+		if err := validation.ValidateTemplateURL(u.URL); err != nil {
 			return fmt.Errorf("invalid '%s': %w", u.FieldName, err)
 		}
 		return nil
 	}
 
 	for _, u := range []urlStruct{
-		{rc.APIURL, "api_url"},
 		{rc.TitleLink, "title_link"},
 		{rc.IconURL, "icon_url"},
 		{rc.ImageURL, "image_url"},

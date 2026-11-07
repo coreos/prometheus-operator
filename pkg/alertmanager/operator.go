@@ -68,10 +68,6 @@ const (
 	selectingAlertmanagerConfigResourcesAction = "SelectingAlertmanagerConfigResources"
 )
 
-var (
-	ErrFieldNotAvailable = errors.New("fields_not_available")
-)
-
 // Config defines the operator's parameters for the Alertmanager controller.
 // Whenever the value of one of these parameters is changed, it triggers an
 // update of the managed statefulsets.
@@ -1806,8 +1802,8 @@ func checkSnsConfigs(
 	amVersion semver.Version,
 ) error {
 	for _, config := range configs {
-		if err := checkFieldSupportedVersion(config.UseAWSHTTPClient, "useAWSHTTPClient", amVersion, semver.MustParse("0.33.0")); err != nil {
-			return err
+		if amVersion.LT(semver.MustParse("0.33.0")) && config.UseAWSHTTPClient != nil {
+			return fmt.Errorf(`'useAWSHTTPClient' is available in Alertmanager >= 0.33.0 only - current %s`, amVersion)
 		}
 
 		if err := checkHTTPConfig(config.HTTPConfig, amVersion); err != nil {
@@ -2121,11 +2117,4 @@ func ApplyConfigurationFromAlertmanager(a *monitoringv1.Alertmanager, updateScal
 	}
 
 	return monitoringv1ac.Alertmanager(a.Name, a.Namespace).WithStatus(asac)
-}
-
-func checkFieldSupportedVersion[T any](field *T, fieldName string, amVersion, supportedVersion semver.Version) error {
-	if amVersion.LT(supportedVersion) && field != nil {
-		return fmt.Errorf(`%w: '%s' is available in Alertmanager >= %s only - current %s`, ErrFieldNotAvailable, fieldName, supportedVersion, amVersion)
-	}
-	return nil
 }

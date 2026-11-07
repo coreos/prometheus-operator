@@ -435,7 +435,9 @@ going to be performed, except for delete actions.</p>
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -2765,7 +2767,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -4987,7 +4991,9 @@ int32
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -7210,7 +7216,9 @@ going to be performed, except for delete actions.</p>
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -9325,7 +9333,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -13458,6 +13468,14 @@ It requires Prometheus &gt;= v3.0.0.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="monitoring.coreos.com/v1.NodeSelector">NodeSelector
+(<code>map[string]string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#monitoring.coreos.com/v1.AlertmanagerSpec">AlertmanagerSpec</a>, <a href="#monitoring.coreos.com/v1.CommonPrometheusFields">CommonPrometheusFields</a>, <a href="#monitoring.coreos.com/v1.ThanosRulerSpec">ThanosRulerSpec</a>)
+</p>
+<div>
+<p>NodeSelector is standard Kubernetes node selector format</p>
+</div>
 <h3 id="monitoring.coreos.com/v1.NonEmptyDuration">NonEmptyDuration
 (<code>string</code> alias)</h3>
 <p>
@@ -16228,7 +16246,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -21185,7 +21205,9 @@ int32
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -24335,7 +24357,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>
@@ -33281,7 +33305,9 @@ Kubernetes core/v1.ResourceRequirements
 <td>
 <code>nodeSelector</code><br/>
 <em>
-map[string]string
+<a href="#monitoring.coreos.com/v1.NodeSelector">
+NodeSelector
+</a>
 </em>
 </td>
 <td>

@@ -28,6 +28,7 @@ import (
 	"github.com/prometheus/alertmanager/timeinterval"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 	"gotest.tools/v3/golden"
@@ -4188,6 +4189,7 @@ func TestGenerateConfigOpsgenieReceiver(t *testing.T) {
 		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
 		golden          string
 		expectedError   bool
+		errMsg          *string
 	}
 
 	version24, err := semver.ParseTolerant("v0.24.0")
@@ -4379,6 +4381,7 @@ func TestGenerateConfigOpsgenieReceiver(t *testing.T) {
 				},
 			},
 			expectedError: true,
+			errMsg:        new("invalid 'api_url': validate url from string failed for https:://example.com/: missing host for URL"),
 		},
 		{
 			name: "CR with Opsgenie Details",
@@ -4527,11 +4530,18 @@ func TestGenerateConfigOpsgenieReceiver(t *testing.T) {
 			)
 			cb.cfg = &tc.baseConfig
 
+			err := cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs)
+
 			if tc.expectedError {
-				require.Error(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+				require.Error(t, err)
+				t.Logf("err: %s", err)
+				if tc.errMsg != nil {
+					assert.EqualError(t, err, *tc.errMsg)
+					return
+				}
 				return
 			}
-			require.NoError(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+			require.NoError(t, err)
 
 			cfgBytes, err := cb.MarshalJSON()
 			require.NoError(t, err)

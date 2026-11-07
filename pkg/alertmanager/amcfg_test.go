@@ -5296,6 +5296,15 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 		Key:                  "tokenID",
 	}
 
+	baseCfg := func() alertmanagerConfig {
+		return alertmanagerConfig{
+			Route: &route{
+				Receiver: "null",
+			},
+			Receivers: []*receiver{{Name: "null"}},
+		}
+	}
+
 	amConfigWith := func(rc ...monitoringv1alpha1.RocketChatConfig) map[string]*monitoringv1alpha1.AlertmanagerConfig {
 		return map[string]*monitoringv1alpha1.AlertmanagerConfig{
 			"mynamespace": {
@@ -5318,15 +5327,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name:      "CR with RocketChatConfig with required fields",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(rocketChatSecret),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig with required fields",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				Token:   tokenSelector,
 				TokenID: tokenIDSelector,
@@ -5334,15 +5338,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 			golden: "CR_with_RocketChatConfig_Required_Fields.golden",
 		},
 		{
-			name:      "CR with RocketChatConfig with all fields",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(rocketChatSecret),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig with all fields",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				SendResolved: new(true),
 				APIURL:       new(monitoringv1alpha1.URL("https://rocketchat.example.com")),
@@ -5374,15 +5373,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 			golden: "CR_with_RocketChatConfig_All_Fields.golden",
 		},
 		{
-			name:      "CR with RocketChatConfig with send resolved disabled",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(rocketChatSecret),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig with send resolved disabled",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				SendResolved: new(false),
 				Channel:      new("#alerts"),
@@ -5392,15 +5386,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 			golden: "CR_with_RocketChatConfig_Send_Resolved_Disabled.golden",
 		},
 		{
-			name:      "CR with RocketChatConfig missing token secret",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig missing token secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				Token:   tokenSelector,
 				TokenID: tokenIDSelector,
@@ -5408,15 +5397,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name:      "CR with RocketChatConfig missing token key in secret",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(rocketChatSecret),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig missing token key in secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				Token: corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat-secret"},
@@ -5427,15 +5411,10 @@ func TestGenerateConfigRocketChatReceiver(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name:      "CR with RocketChatConfig missing token ID key in secret",
-			amVersion: &version28,
-			kclient:   fake.NewClientset(rocketChatSecret),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with RocketChatConfig missing token ID key in secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
 			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
 				Token: tokenSelector,
 				TokenID: corev1.SecretKeySelector{

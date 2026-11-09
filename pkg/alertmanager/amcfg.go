@@ -2054,7 +2054,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	}
 
 	if in.Token != nil {
-		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token, validation.NotEmpty)
+		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token)
 		if err != nil {
 			return fmt.Errorf("failed to get Rocket Chat Token: %w", err)
 		}
@@ -2062,7 +2062,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	}
 
 	if in.TokenID != nil {
-		tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.TokenID, validation.NotEmpty)
+		tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.TokenID)
 		if err != nil {
 			return fmt.Errorf("failed to get Rocket Chat Token ID: %w", err)
 		}

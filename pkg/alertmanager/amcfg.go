@@ -3847,17 +3847,15 @@ func (cb *ConfigBuilder) checkGlobalRocketChatConfig(
 		return fmt.Errorf(`'rocketChat' integration requires Alertmanager >= 0.28.0 - current %s`, cb.amVersion)
 	}
 
-	getSecretFailErrMsg := "failed to retrieve '%q': %w"
-
 	if rc.Token != nil {
-		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.Token, validation.NotEmpty); err != nil {
-			return fmt.Errorf(getSecretFailErrMsg, "token", err)
+		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.Token); err != nil {
+			return err
 		}
 	}
 
 	if rc.TokenID != nil {
-		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.TokenID, validation.NotEmpty); err != nil {
-			return fmt.Errorf(getSecretFailErrMsg, "tokenID", err)
+		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.TokenID); err != nil {
+			return err
 		}
 	}
 

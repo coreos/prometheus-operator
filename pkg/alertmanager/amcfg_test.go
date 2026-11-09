@@ -4803,6 +4803,8 @@ func TestGenerateConfigTelegramReceiver(t *testing.T) {
 			)
 			cb.cfg = &tc.baseConfig
 
+			err := cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs)
+
 			if tc.expectedError {
 				require.Error(t, err)
 				t.Logf("err: %s", err)
@@ -4812,7 +4814,7 @@ func TestGenerateConfigTelegramReceiver(t *testing.T) {
 				}
 				return
 			}
-			require.NoError(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+			require.NoError(t, err)
 
 			cfgBytes, err := cb.MarshalJSON()
 			require.NoError(t, err)

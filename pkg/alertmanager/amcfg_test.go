@@ -4744,7 +4744,7 @@ func TestGenerateConfigTelegramReceiver(t *testing.T) {
 				},
 			},
 			expectedError: true,
-			errMsg:        new("missing mandatory field 'botToken'"),
+			errMsg:        new(`AlertmanagerConfig mynamespace/myamc: TelegramConfig[0]: missing mandatory field 'botToken'`),
 		},
 		{
 			name:      "CR with Telegram Missing botToken and botTokenFile",
@@ -4780,7 +4780,7 @@ func TestGenerateConfigTelegramReceiver(t *testing.T) {
 				},
 			},
 			expectedError: true,
-			errMsg:        new("missing mandatory field 'botToken' or 'botTokenFile'"),
+			errMsg:        new(`AlertmanagerConfig mynamespace/myamc: TelegramConfig[0]: missing mandatory field 'botToken' or 'botTokenFile'`),
 		},
 	}
 

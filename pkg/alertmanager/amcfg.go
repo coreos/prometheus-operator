@@ -1535,9 +1535,9 @@ func (cb *ConfigBuilder) convertTelegramConfig(ctx context.Context, in monitorin
 	if out.BotToken == "" && out.BotTokenFile == "" {
 		if cb.cfg.Global == nil || (cb.cfg.Global.TelegramBotToken == "" && cb.cfg.Global.TelegramBotTokenFile == "") {
 			if cb.amVersion.LT(semver.MustParse("0.26.0")) {
-				return nil, fmt.Errorf("missing mandatory field '%q'", "botToken")
+				return nil, errors.New(`missing mandatory field 'botToken'`)
 			}
-			return nil, fmt.Errorf("missing mandatory field '%q' or '%q'", "botToken", "botTokenFile")
+			return nil, errors.New(`missing mandatory field 'botToken' or 'botTokenFile'`)
 		}
 	}
 

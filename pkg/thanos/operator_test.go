@@ -81,6 +81,108 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 			golden: "v0.24.0_remote_write_config_unsupported_fields.golden",
 		},
 		{
+			name:    "with v0.30.0 dropping unsupported fields",
+			version: "v0.30.0",
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL:                  "http://example.com",
+					MessageVersion:       ptr.To(monitoringv1.RemoteWriteMessageVersion2_0),
+					SendNativeHistograms: new(true),
+					RoundRobinDNS:        new(true),
+					EnableHttp2:          new(true),
+					TLSConfig: &monitoringv1.TLSConfig{
+						SafeTLSConfig: monitoringv1.SafeTLSConfig{
+							MinVersion: ptr.To(monitoringv1.TLSVersion12),
+							MaxVersion: ptr.To(monitoringv1.TLSVersion13),
+						},
+					},
+					ProxyConfig: monitoringv1.ProxyConfig{
+						ProxyURL: ptr.To("http://proxy:3128"),
+						NoProxy:  ptr.To(".internal"),
+					},
+					QueueConfig: &monitoringv1.QueueConfig{
+						Capacity:       100,
+						MaxRetries:     3,
+						SampleAgeLimit: ptr.To(monitoringv1.Duration("30m")),
+					},
+					AzureAD: &monitoringv1.AzureAD{
+						ManagedIdentity: &monitoringv1.ManagedIdentity{
+							ClientID: ptr.To("client-id"),
+						},
+					},
+				},
+			},
+			golden: "v0.30.0_remote_write_config_unsupported_fields.golden",
+		},
+		{
+			name:    "with v0.31.0 dropping unsupported fields",
+			version: "v0.31.0",
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL: "http://example.com",
+					TLSConfig: &monitoringv1.TLSConfig{
+						SafeTLSConfig: monitoringv1.SafeTLSConfig{
+							MaxVersion: ptr.To(monitoringv1.TLSVersion13),
+						},
+					},
+					AzureAD: &monitoringv1.AzureAD{
+						ManagedIdentity: &monitoringv1.ManagedIdentity{
+							ClientID: ptr.To("client-id"),
+						},
+					},
+				},
+			},
+			golden: "v0.31.0_remote_write_config_unsupported_fields.golden",
+		},
+		{
+			name:    "remote write with azureAD.sdk not supported by the thanos version",
+			version: "v0.31.0",
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL: "http://example.com",
+					AzureAD: &monitoringv1.AzureAD{
+						SDK: &monitoringv1.AzureSDK{
+							TenantID: ptr.To("tenant"),
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:    "with v0.36.0 dropping unsupported fields",
+			version: "v0.36.0",
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL:                  "http://example.com",
+					MessageVersion:       ptr.To(monitoringv1.RemoteWriteMessageVersion2_0),
+					SendNativeHistograms: new(true),
+					RoundRobinDNS:        new(true),
+					EnableHttp2:          new(true),
+					TLSConfig: &monitoringv1.TLSConfig{
+						SafeTLSConfig: monitoringv1.SafeTLSConfig{
+							MaxVersion: ptr.To(monitoringv1.TLSVersion13),
+						},
+					},
+					ProxyConfig: monitoringv1.ProxyConfig{
+						ProxyURL: ptr.To("http://proxy:3128"),
+						NoProxy:  ptr.To(".internal"),
+					},
+					QueueConfig: &monitoringv1.QueueConfig{
+						Capacity:       100,
+						MaxRetries:     3,
+						SampleAgeLimit: ptr.To(monitoringv1.Duration("30m")),
+					},
+					AzureAD: &monitoringv1.AzureAD{
+						SDK: &monitoringv1.AzureSDK{
+							TenantID: ptr.To("tenant"),
+						},
+					},
+				},
+			},
+			golden: "v0.36.0_remote_write_config_unsupported_fields.golden",
+		},
+		{
 			name:    "remote write with invalid write relabel config regex",
 			version: operator.DefaultThanosVersion,
 			remoteWrite: []monitoringv1.RemoteWriteSpec{

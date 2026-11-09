@@ -51,3 +51,15 @@ func TestPrometheusVersionForThanos(t *testing.T) {
 		})
 	}
 }
+
+func TestThanosPrometheusEquivalentsOrder(t *testing.T) {
+	for i := 1; i < len(thanosPrometheusEquivalents); i++ {
+		require.Truef(
+			t,
+			thanosPrometheusEquivalents[i-1].thanos.GT(thanosPrometheusEquivalents[i].thanos),
+			"thanosPrometheusEquivalents must be sorted by descending Thanos version, got %s before %s",
+			thanosPrometheusEquivalents[i-1].thanos,
+			thanosPrometheusEquivalents[i].thanos,
+		)
+	}
+}

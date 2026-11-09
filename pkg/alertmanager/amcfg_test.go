@@ -4328,7 +4328,6 @@ func TestGenerateConfigDiscordReceiver(t *testing.T) {
 		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
 		golden          string
 		expectedError   bool
-		errMsg          *string
 	}
 
 	version25, err := semver.ParseTolerant("v0.25.0")

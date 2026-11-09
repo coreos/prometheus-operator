@@ -2054,7 +2054,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	}
 
 	if in.Token != nil {
-		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token)
+		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token, validation.NotEmpty)
 		if err != nil {
 			return fmt.Errorf("failed to get Rocket Chat Token: %w", err)
 		}
@@ -2062,7 +2062,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	}
 
 	if in.TokenID != nil {
-		tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.TokenID)
+		tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.TokenID, validation.NotEmpty)
 		if err != nil {
 			return fmt.Errorf("failed to get Rocket Chat Token ID: %w", err)
 		}
@@ -3847,15 +3847,17 @@ func (cb *ConfigBuilder) checkGlobalRocketChatConfig(
 		return fmt.Errorf(`'rocketChat' integration requires Alertmanager >= 0.28.0 - current %s`, cb.amVersion)
 	}
 
+	getSecretFailErrMsg := "failed to retrieve '%q': %w"
+
 	if rc.Token != nil {
-		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.Token); err != nil {
-			return err
+		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.Token, validation.NotEmpty); err != nil {
+			return fmt.Errorf(getSecretFailErrMsg, "token", err)
 		}
 	}
 
 	if rc.TokenID != nil {
-		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.TokenID); err != nil {
-			return err
+		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.TokenID, validation.NotEmpty); err != nil {
+			return fmt.Errorf(getSecretFailErrMsg, "tokenID", err)
 		}
 	}
 

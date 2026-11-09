@@ -2635,6 +2635,190 @@ func TestCheckWebhookAlertmanagerConfig(t *testing.T) {
 	}
 }
 
+func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
+	version27, err := semver.ParseTolerant("v0.27.0")
+	require.NoError(t, err)
+
+	version28, err := semver.ParseTolerant("v0.28.0")
+	require.NoError(t, err)
+
+	c := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "secret",
+				Namespace: "ns1",
+			},
+			Data: map[string][]byte{
+				"token":    []byte("abc1243"),
+				"token-id": []byte("user-id"),
+				"empty":    []byte(""),
+			},
+		},
+	)
+
+	newSelector := func(name, key string) corev1.SecretKeySelector {
+		return corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: name},
+			Key:                  key,
+		}
+	}
+
+	newAMConfig := func(name string, configs ...monitoringv1alpha1.RocketChatConfig) *monitoringv1alpha1.AlertmanagerConfig {
+		return &monitoringv1alpha1.AlertmanagerConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "ns1",
+			},
+			Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+				Route: &monitoringv1alpha1.Route{
+					Receiver: "recv1",
+				},
+				Receivers: []monitoringv1alpha1.Receiver{{
+					Name:              "recv1",
+					RocketChatConfigs: configs,
+				}},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		amConfig *monitoringv1alpha1.AlertmanagerConfig
+		version  *semver.Version
+		ok       bool
+	}{
+		{
+			amConfig: newAMConfig("rocketchat-unsupported-version",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+			),
+			version: &version27,
+			ok:      false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-supported-version",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+			),
+			version: &version28,
+			ok:      true,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-with-optional-fields",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+					Channel: new("#alerts"),
+					Color:   new("red"),
+					Text:    new("{{ .CommonAnnotations.summary }}"),
+				},
+			),
+			ok: true,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-with-multiple-configs",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+					Channel: new("#other"),
+				},
+			),
+			ok: true,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-with-missing-secret",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("not-existing", "token"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-with-missing-key",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "not-existing"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-with-empty-value",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "empty"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-id-with-missing-secret",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("not-existing", "token-id"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-id-with-missing-key",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "not-existing"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-token-id-with-empty-value",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "empty"),
+				},
+			),
+			ok: false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-second-config-invalid",
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "token-id"),
+				},
+				monitoringv1alpha1.RocketChatConfig{
+					Token:   newSelector("secret", "token"),
+					TokenID: newSelector("secret", "empty"),
+				},
+			),
+			ok: false,
+		},
+	} {
+		t.Run(tc.amConfig.Name, func(t *testing.T) {
+			store := assets.NewStoreBuilder(c.CoreV1(), c.CoreV1())
+
+			amVersion := version28
+			if tc.version != nil {
+				amVersion = *tc.version
+			}
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
+			if tc.ok {
+				require.NoError(t, err)
+				return
+			}
+
+			t.Logf("err: %s", err)
+			require.Error(t, err)
+		})
+	}
+}
+
 // Test to exercise the function provisionAlertmanagerConfiguration
 // and validate that the operator is able to generate an Alertmanager
 // configuration depending on the method chosen by the user.

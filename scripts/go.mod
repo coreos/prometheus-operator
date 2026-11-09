@@ -12,8 +12,8 @@ require (
 	github.com/prometheus/prometheus v0.315.0
 	github.com/simonpasquier/metrics-gen v0.0.0-20260724132104-20228c8d995c
 	github.com/yeya24/promlinter v0.3.0
-	k8s.io/code-generator v0.37.1
-	sigs.k8s.io/controller-tools v0.22.0
+	k8s.io/code-generator v0.37.2
+	sigs.k8s.io/controller-tools v0.23.0
 )
 
 require (
@@ -328,7 +328,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/alertmanager v0.34.0 // indirect
+	github.com/prometheus/alertmanager v0.34.2 // indirect
 	github.com/prometheus/client_golang v1.24.1 // indirect
 	github.com/prometheus/client_golang/exp v0.0.0-20260907100614-57bb367da472 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
@@ -440,7 +440,7 @@ require (
 	honnef.co/go/tools v0.8.2 // indirect
 	k8s.io/api v0.37.0 // indirect
 	k8s.io/apiextensions-apiserver v0.37.0 // indirect
-	k8s.io/apimachinery v0.37.1 // indirect
+	k8s.io/apimachinery v0.37.2 // indirect
 	k8s.io/client-go v0.37.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect

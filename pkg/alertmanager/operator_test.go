@@ -203,6 +203,18 @@ func TestCreateStatefulSetInputHashClusterTLSConfig(t *testing.T) {
 	require.NotEqual(t, initialHash, changedHash)
 }
 
+// allowAllFileSystemAM returns an Alertmanager object whose filesystem mode
+// allows AlertmanagerConfig resources to reference the container's filesystem.
+// It is used by tests focusing on version-based validation so that the
+// filesystem access check doesn't interfere with them.
+func allowAllFileSystemAM() *monitoringv1.Alertmanager {
+	return &monitoringv1.Alertmanager{
+		Spec: monitoringv1.AlertmanagerSpec{
+			AlertmanagerConfigFileSystemMode: ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+		},
+	}
+}
+
 // Test to exercise the function checkAlertmanagerConfigResource
 // and validate that semantic validation is in place for all the fields in the
 // AlertmanagerConfig CR. The validation is performed by the operator
@@ -1739,7 +1751,7 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -1749,6 +1761,172 @@ func TestCheckAlertmanagerConfig(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestCheckAlertmanagerConfigFileSystemAccess(t *testing.T) {
+	version, err := semver.ParseTolerant("v0.26.0")
+	require.NoError(t, err)
+
+	store := assets.NewStoreBuilder(fake.NewClientset().CoreV1(), fake.NewClientset().CoreV1())
+
+	// withFileRef is an otherwise valid AlertmanagerConfig which references the
+	// Alertmanager container's filesystem (via the Telegram 'botTokenFile').
+	withFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "with-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+				TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+					BotTokenFile: new("/etc/secrets/token"),
+					ChatID:       1234,
+				}},
+			}},
+		},
+	}
+
+	// withoutFileRef is a valid AlertmanagerConfig with no filesystem reference.
+	withoutFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "without-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+			}},
+		},
+	}
+
+	// withPushoverFileRef is an otherwise valid AlertmanagerConfig which
+	// references the filesystem via the Pushover 'userKeyFile'/'tokenFile'.
+	withPushoverFileRef := &monitoringv1alpha1.AlertmanagerConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "with-pushover-file-ref",
+			Namespace: "other-ns",
+		},
+		Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+			Route: &monitoringv1alpha1.Route{
+				Receiver: "recv1",
+			},
+			Receivers: []monitoringv1alpha1.Receiver{{
+				Name: "recv1",
+				PushoverConfigs: []monitoringv1alpha1.PushoverConfig{{
+					UserKeyFile: new("/etc/pushover/user_key"),
+					TokenFile:   new("/etc/pushover/token"),
+				}},
+			}},
+		},
+	}
+
+	newAM := func(mode *monitoringv1.AlertmanagerConfigFileSystemMode, strategy monitoringv1.AlertmanagerConfigMatcherStrategyType) *monitoringv1.Alertmanager {
+		return &monitoringv1.Alertmanager{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "am",
+				Namespace: "am-ns",
+			},
+			Spec: monitoringv1.AlertmanagerSpec{
+				AlertmanagerConfigFileSystemMode: mode,
+				AlertmanagerConfigMatcherStrategy: monitoringv1.AlertmanagerConfigMatcherStrategy{
+					Type: strategy,
+				},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		name     string
+		mode     *monitoringv1.AlertmanagerConfigFileSystemMode
+		strategy monitoringv1.AlertmanagerConfigMatcherStrategyType
+		amc      *monitoringv1alpha1.AlertmanagerConfig
+		wantErr  bool
+	}{
+		{
+			name:    "AllowAll allows telegram file reference",
+			mode:    ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+			amc:     withFileRef,
+			wantErr: false,
+		},
+		{
+			name:    "AllowAll allows pushover file reference",
+			mode:    ptr.To(monitoringv1.AllowAllAlertmanagerConfigFileSystemMode),
+			amc:     withPushoverFileRef,
+			wantErr: false,
+		},
+		{
+			name:    "DenyAll denies telegram file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withFileRef,
+			wantErr: true,
+		},
+		{
+			name:    "DenyAll denies pushover file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withPushoverFileRef,
+			wantErr: true,
+		},
+		{
+			name:    "DenyAll accepts config without file reference",
+			mode:    ptr.To(monitoringv1.DenyAllAlertmanagerConfigFileSystemMode),
+			amc:     withoutFileRef,
+			wantErr: false,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with None allows",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.NoneConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  false,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with OnNamespace denies non-global",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.OnNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+		{
+			name:     "FromAlertmanagerConfigMatcherStrategy with OnNamespaceExcept denies other namespaces",
+			mode:     ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode),
+			strategy: monitoringv1.OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+		{
+			name:     "default mode is FromAlertmanagerConfigMatcherStrategy (OnNamespace) denying non-global",
+			mode:     nil,
+			strategy: monitoringv1.OnNamespaceConfigMatcherStrategyType,
+			amc:      withFileRef,
+			wantErr:  true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			am := newAM(tc.mode, tc.strategy)
+			err := checkAlertmanagerConfigResource(context.Background(), am, tc.amc, version, store)
+			if tc.wantErr {
+				require.Error(t, err)
+				// The failure must wrap the filesystem denial sentinel error.
+				require.ErrorIs(t, err, errFileSystemDenied)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+
+	t.Run("OnNamespaceExcept allows Alertmanager namespace", func(t *testing.T) {
+		am := newAM(ptr.To(monitoringv1.FromAlertmanagerConfigMatcherStrategyAlertmanagerConfigFileSystemMode), monitoringv1.OnNamespaceExceptForAlertmanagerNamespaceConfigMatcherStrategyType)
+		amc := withFileRef.DeepCopy()
+		amc.Namespace = am.Namespace
+		require.NoError(t, checkAlertmanagerConfigResource(context.Background(), am, amc, version, store))
+	})
 }
 
 func TestCheckWebexAlertmanagerConfigEmptyCredentials(t *testing.T) {
@@ -1807,7 +1985,7 @@ func TestCheckWebexAlertmanagerConfigEmptyCredentials(t *testing.T) {
 				},
 			}
 
-			err := checkAlertmanagerConfigResource(context.Background(), config, version, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), config, version, store)
 			if tc.expectErr {
 				require.Error(t, err)
 				return
@@ -1964,7 +2142,7 @@ func TestCheckOpsGenieAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -2107,7 +2285,7 @@ func TestCheckDiscordAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
@@ -2445,7 +2623,7 @@ func TestCheckWebhookAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return

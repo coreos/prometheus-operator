@@ -2994,6 +2994,59 @@ func testAlertmanagerCRDValidation(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		//
+		// Web CORS Origin Validation:
+		//
+		{
+			name: "valid-cors-origin",
+			alertmanagerSpec: monitoringv1.AlertmanagerSpec{
+				Replicas: &replicas,
+				Web: &monitoringv1.AlertmanagerWebSpec{
+					CORSOrigin: new(`https://example\.com`),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "valid-cors-origin-alternation",
+			alertmanagerSpec: monitoringv1.AlertmanagerSpec{
+				Replicas: &replicas,
+				Web: &monitoringv1.AlertmanagerWebSpec{
+					CORSOrigin: new(`https?://(foo|bar)\.example\.com`),
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "invalid-cors-origin-empty",
+			alertmanagerSpec: monitoringv1.AlertmanagerSpec{
+				Replicas: &replicas,
+				Web: &monitoringv1.AlertmanagerWebSpec{
+					CORSOrigin: new(``), // Empty string violates MinLength constraint
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid-cors-origin-unclosed-group",
+			alertmanagerSpec: monitoringv1.AlertmanagerSpec{
+				Replicas: &replicas,
+				Web: &monitoringv1.AlertmanagerWebSpec{
+					CORSOrigin: new(`https://(foo`), // Not a valid regular expression
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "invalid-cors-origin-bad-char-class",
+			alertmanagerSpec: monitoringv1.AlertmanagerSpec{
+				Replicas: &replicas,
+				Web: &monitoringv1.AlertmanagerWebSpec{
+					CORSOrigin: new(`[a-`), // Not a valid regular expression
+				},
+			},
+			expectedError: true,
+		},
 	}
 
 	for _, test := range tests {

@@ -3,8 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: alertmanagerconfigs.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -13629,8 +13629,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: alertmanagers.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -14644,6 +14644,30 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              alertmanagerConfigFileSystemMode:
+                description: |-
+                  alertmanagerConfigFileSystemMode defines how the operator handles
+                  AlertmanagerConfig resources which have references to the Alertmanager
+                  container's filesystem (as opposed to secret key references). Users
+                  controlling the receiver's service may create an AlertmanagerConfig
+                  resource with a reference to a container's file (for instance using
+                  `botTokenFile` for the Telegram receiver) and exfiltrate sensitive
+                  content from files located in the Alertmanager container.
+
+                  Supported values are:
+                  - "DenyAll" denies any AlertmanagerConfig resource referencing files from the container's filesystem, non-compliant resources are rejected.
+                  - "FromAlertmanagerConfigMatcherStrategy" uses the `alertmanagerConfigNamespaceSelector` field to make a decision
+                    - When `alertmanagerConfigNamespaceSelector` is "None", it is equivalent to "AllowAll"
+                    - When `alertmanagerConfigNamespaceSelector` is "OnNamespaceExceptForAlertmanagerNamespace", it is equivalent to "AllowAll" for the AlertmanagerConfig resources located in the Alertmanager's namespace and "DenyAll" for all other resources.
+                    - When `alertmanagerConfigNamespaceSelector` is "OnNamespace", it is equivalent to "AllowAll" for the main AlertmanagerConfig resource (defined in `.spec.alertmanagerConfig.name`) and "DenyAll" for all other resources.
+                  - "AllowAll" allows any AlertmanagerConfig resource to reference files from the container's filesystem (use with caution).
+
+                  By default, the operator uses the "FromAlertmanagerConfigMatcherStrategy" mode.
+                enum:
+                - AllowAll
+                - FromAlertmanagerConfigMatcherStrategy
+                - DenyAll
+                type: string
               alertmanagerConfigMatcherStrategy:
                 description: |-
                   alertmanagerConfigMatcherStrategy defines how AlertmanagerConfig objects
@@ -21203,6 +21227,7 @@ spec:
                                         reason is a brief CamelCase machine-parseable reason.
                                         Together with status it forms the unique identity of a condition entry.
                                         Maximum permitted length of a reason is 256 bytes.
+                                      minLength: 1
                                       type: string
                                     status:
                                       description: |-
@@ -21215,11 +21240,13 @@ spec:
                                       - DataLoss
                                       - Degraded
                                       - Inaccessible
+                                      minLength: 1
                                       type: string
                                   required:
                                   - reason
                                   - status
                                   type: object
+                                maxItems: 16
                                 type: array
                                 x-kubernetes-list-map-keys:
                                 - status
@@ -23628,6 +23655,17 @@ spec:
                 description: web defines the web command line flags when starting
                   Alertmanager.
                 properties:
+                  corsOrigin:
+                    description: |-
+                      corsOrigin is a fully anchored regular expression matching the origins
+                      allowed to call the API from a browser. This corresponds to the
+                      Alertmanager's `--web.cors.origin` flag.
+                      It requires Alertmanager >= v0.34.2.
+                    minLength: 1
+                    type: string
+                    x-kubernetes-validations:
+                    - message: corsOrigin must be a valid regular expression
+                      rule: '''''.matches(''^(?:''+self+'')$'') || !''''.matches(''^(?:''+self+'')$'')'
                   getConcurrency:
                     description: |-
                       getConcurrency defines the maximum number of GET requests processed concurrently. This corresponds to the
@@ -24024,8 +24062,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: podmonitors.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -25454,8 +25492,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: probes.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -26898,8 +26936,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: prometheusagents.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -35608,6 +35646,7 @@ spec:
                                         reason is a brief CamelCase machine-parseable reason.
                                         Together with status it forms the unique identity of a condition entry.
                                         Maximum permitted length of a reason is 256 bytes.
+                                      minLength: 1
                                       type: string
                                     status:
                                       description: |-
@@ -35620,11 +35659,13 @@ spec:
                                       - DataLoss
                                       - Degraded
                                       - Inaccessible
+                                      minLength: 1
                                       type: string
                                   required:
                                   - reason
                                   - status
                                   type: object
+                                maxItems: 16
                                 type: array
                                 x-kubernetes-list-map-keys:
                                 - status
@@ -38830,8 +38871,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: prometheuses.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -49366,6 +49407,7 @@ spec:
                                         reason is a brief CamelCase machine-parseable reason.
                                         Together with status it forms the unique identity of a condition entry.
                                         Maximum permitted length of a reason is 256 bytes.
+                                      minLength: 1
                                       type: string
                                     status:
                                       description: |-
@@ -49378,11 +49420,13 @@ spec:
                                       - DataLoss
                                       - Degraded
                                       - Inaccessible
+                                      minLength: 1
                                       type: string
                                   required:
                                   - reason
                                   - status
                                   type: object
+                                maxItems: 16
                                 type: array
                                 x-kubernetes-list-map-keys:
                                 - status
@@ -53132,8 +53176,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: prometheusrules.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -53399,8 +53443,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: scrapeconfigs.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -66514,8 +66558,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: servicemonitors.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -67972,8 +68016,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.2
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: thanosrulers.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -75243,6 +75287,7 @@ spec:
                                         reason is a brief CamelCase machine-parseable reason.
                                         Together with status it forms the unique identity of a condition entry.
                                         Maximum permitted length of a reason is 256 bytes.
+                                      minLength: 1
                                       type: string
                                     status:
                                       description: |-
@@ -75255,11 +75300,13 @@ spec:
                                       - DataLoss
                                       - Degraded
                                       - Inaccessible
+                                      minLength: 1
                                       type: string
                                   required:
                                   - reason
                                   - status
                                   type: object
+                                maxItems: 16
                                 type: array
                                 x-kubernetes-list-map-keys:
                                 - status
@@ -78082,7 +78129,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/version: 0.94.2
+    app.kubernetes.io/version: 0.95.1
   name: prometheus-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -78099,7 +78146,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/version: 0.94.2
+    app.kubernetes.io/version: 0.95.1
   name: prometheus-operator
 rules:
 - apiGroups:
@@ -78251,7 +78298,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/version: 0.94.2
+    app.kubernetes.io/version: 0.95.1
   name: prometheus-operator
   namespace: default
 spec:
@@ -78267,13 +78314,13 @@ spec:
       labels:
         app.kubernetes.io/component: controller
         app.kubernetes.io/name: prometheus-operator
-        app.kubernetes.io/version: 0.94.2
+        app.kubernetes.io/version: 0.95.1
     spec:
       automountServiceAccountToken: true
       containers:
       - args:
         - --kubelet-service=kube-system/kubelet
-        - --prometheus-config-reloader=quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2
+        - --prometheus-config-reloader=quay.io/prometheus-operator/prometheus-config-reloader:v0.95.1
         - --watch-referenced-objects-in-all-namespaces=true
         - --disable-unmanaged-prometheus-configuration=true
         - --kubelet-endpoints=true
@@ -78281,7 +78328,7 @@ spec:
         env:
         - name: GOGC
           value: "30"
-        image: quay.io/prometheus-operator/prometheus-operator:v0.94.2
+        image: quay.io/prometheus-operator/prometheus-operator:v0.95.1
         name: prometheus-operator
         ports:
         - containerPort: 8080
@@ -78315,7 +78362,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/version: 0.94.2
+    app.kubernetes.io/version: 0.95.1
   name: prometheus-operator
   namespace: default
 ---
@@ -78325,7 +78372,7 @@ metadata:
   labels:
     app.kubernetes.io/component: controller
     app.kubernetes.io/name: prometheus-operator
-    app.kubernetes.io/version: 0.94.2
+    app.kubernetes.io/version: 0.95.1
   name: prometheus-operator
   namespace: default
 spec:

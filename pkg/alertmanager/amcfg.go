@@ -233,6 +233,7 @@ type ConfigBuilder struct {
 	amVersion semver.Version
 	store     *assets.StoreBuilder
 	enforcer  enforcer
+	am        *monitoringv1.Alertmanager
 }
 
 func NewConfigBuilder(logger *slog.Logger, amVersion semver.Version, store *assets.StoreBuilder, am *monitoringv1.Alertmanager) *ConfigBuilder {
@@ -241,6 +242,7 @@ func NewConfigBuilder(logger *slog.Logger, amVersion semver.Version, store *asse
 		amVersion: amVersion,
 		store:     store,
 		enforcer:  getEnforcer(am.Spec.AlertmanagerConfigMatcherStrategy, amVersion, am.Namespace),
+		am:        am,
 	}
 	return cg
 }
@@ -279,7 +281,7 @@ func (cb *ConfigBuilder) initializeFromAlertmanagerConfig(ctx context.Context, g
 		Name:      amConfig.Name,
 	}
 
-	if err := checkAlertmanagerConfigResource(ctx, amConfig, cb.amVersion, cb.store); err != nil {
+	if err := checkAlertmanagerConfigResource(ctx, cb.am, amConfig, cb.amVersion, cb.store); err != nil {
 		return err
 	}
 

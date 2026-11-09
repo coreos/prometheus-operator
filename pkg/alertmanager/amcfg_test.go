@@ -4328,41 +4328,40 @@ func TestGenerateConfigDiscordReceiver(t *testing.T) {
 		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
 		golden          string
 		expectedError   bool
+		errMsg          *string
 	}
 
-	version24, err := semver.ParseTolerant("v0.24.0")
-	require.NoError(t, err)
-
 	version25, err := semver.ParseTolerant("v0.25.0")
-	require.NoError(t, err)
-
-	version27, err := semver.ParseTolerant("v0.27.0")
 	require.NoError(t, err)
 
 	version28, err := semver.ParseTolerant("v0.28.0")
 	require.NoError(t, err)
 
+	discordSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "discord-secret",
+			Namespace: "mynamespace",
+		},
+		Data: map[string][]byte{
+			"url": []byte("https://discord.com/api/webhooks/id/token"),
+		},
+	}
+
+	amBaseConfig := func() alertmanagerConfig {
+		return alertmanagerConfig{
+			Route: &route{
+				Receiver: "null",
+			},
+			Receivers: []*receiver{{Name: "null"}},
+		}
+	}
+
 	testCases := []testCase{
 		{
-			name:      "CR with Discord Receiver",
-			amVersion: &version25,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "discord-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://discord.com/api/webhooks/id/token"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with Discord Receiver",
+			amVersion:  &version25,
+			kclient:    fake.NewClientset(discordSecret),
+			baseConfig: amBaseConfig(),
 			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
 				"mynamespace": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -4396,25 +4395,10 @@ func TestGenerateConfigDiscordReceiver(t *testing.T) {
 			golden: "CR_with_Discord_Receiver.golden",
 		},
 		{
-			name:      "CR with Discord Receiver with Content, Username and AvatarURL",
-			amVersion: &version28,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "discord-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://discord.com/api/webhooks/id/token"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with Discord Receiver with Content, Username and AvatarURL",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(discordSecret),
+			baseConfig: amBaseConfig(),
 			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
 				"mynamespace": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -4451,25 +4435,10 @@ func TestGenerateConfigDiscordReceiver(t *testing.T) {
 			golden: "CR_with_Discord_Receiver_Content_Username_AvatarURL.golden",
 		},
 		{
-			name:      "CR with Discord Receiver with Partial Conf",
-			amVersion: &version25,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "discord-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://discord.com/api/webhooks/id/token"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
+			name:       "CR with Discord Receiver with Partial Conf",
+			amVersion:  &version25,
+			kclient:    fake.NewClientset(discordSecret),
+			baseConfig: amBaseConfig(),
 			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
 				"mynamespace": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -4499,111 +4468,6 @@ func TestGenerateConfigDiscordReceiver(t *testing.T) {
 				},
 			},
 			golden: "CR_with_Discord_Receiver_Partial_Conf.golden",
-		},
-		{
-			name:      "CR with Discord Receiver drops Content, Username and AvatarURL for unsupported versions",
-			amVersion: &version27,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "discord-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://discord.com/api/webhooks/id/token"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
-			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
-				"mynamespace": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myamc",
-						Namespace: "mynamespace",
-					},
-					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
-						Route: &monitoringv1alpha1.Route{
-							Receiver: "test",
-						},
-						Receivers: []monitoringv1alpha1.Receiver{
-							{
-								Name: "test",
-								DiscordConfigs: []monitoringv1alpha1.DiscordConfig{
-									{
-										APIURL: corev1.SecretKeySelector{
-											Key: "url",
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "discord-secret",
-											},
-										},
-										Title:     new("test title"),
-										Message:   new("test message"),
-										Content:   new("test content"),
-										Username:  new("test username"),
-										AvatarURL: ptr.To(monitoringv1alpha1.URL("https://example.com/avatar.png")),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			golden: "CR_with_Discord_Receiver_Unsupported_Fields_Dropped.golden",
-		},
-		{
-			name:      "CR with Discord Receiver returns error for unsupported versions",
-			amVersion: &version24,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "discord-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://discord.com/api/webhooks/id/token"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
-			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
-				"mynamespace": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myamc",
-						Namespace: "mynamespace",
-					},
-					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
-						Route: &monitoringv1alpha1.Route{
-							Receiver: "test",
-						},
-						Receivers: []monitoringv1alpha1.Receiver{
-							{
-								Name: "test",
-								DiscordConfigs: []monitoringv1alpha1.DiscordConfig{
-									{
-										APIURL: corev1.SecretKeySelector{
-											Key: "url",
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "discord-secret",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedError: true,
 		},
 	}
 

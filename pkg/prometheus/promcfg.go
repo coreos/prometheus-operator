@@ -148,6 +148,17 @@ func WithoutVersionCheck() ConfigGeneratorOption {
 	}
 }
 
+// WithPrometheusVersion sets the Prometheus version assumed by the generator.
+// It is only useful when the generator isn't bound to a
+// Prometheus/PrometheusAgent object, e.g. the ThanosRuler remote-write
+// configuration which needs to be validated against the Prometheus version
+// equivalent to the Thanos version.
+func WithPrometheusVersion(version semver.Version) ConfigGeneratorOption {
+	return func(cg *ConfigGenerator) {
+		cg.version = version
+	}
+}
+
 // NewConfigGenerator creates a ConfigGenerator for the provided Prometheus resource.
 func NewConfigGenerator(
 	logger *slog.Logger,

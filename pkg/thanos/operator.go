@@ -1053,7 +1053,12 @@ func (o *Operator) createOrUpdateRulerConfigSecret(ctx context.Context, store *a
 		// Thanos v0.24.0 is equivalent to Prometheus v2.32.0.
 	}
 
-	cg, err := prompkg.NewConfigGenerator(o.logger, nil, prompkg.WithoutVersionCheck())
+	cg, err := prompkg.NewConfigGenerator(
+		o.logger,
+		nil,
+		prompkg.WithoutVersionCheck(),
+		prompkg.WithPrometheusVersion(operator.PrometheusVersionForThanos(version)),
+	)
 	if err != nil {
 		return err
 	}

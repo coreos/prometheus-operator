@@ -34,3 +34,32 @@ func ValidationSchemeForThanos(version semver.Version) model.ValidationScheme {
 	}
 	return model.LegacyValidation
 }
+
+// thanosPrometheusEquivalents maps Thanos versions to the equivalent
+// Prometheus version, sorted by descending Thanos version.
+var thanosPrometheusEquivalents = []struct {
+	thanos     semver.Version
+	prometheus semver.Version
+}{
+	{semver.MustParse("0.40.0"), semver.MustParse("3.5.1")},
+	{semver.MustParse("0.38.0"), semver.MustParse("3.1.0")},
+	{semver.MustParse("0.37.0"), semver.MustParse("2.55.1")},
+	{semver.MustParse("0.36.0"), semver.MustParse("2.52.2")},
+	{semver.MustParse("0.32.0"), semver.MustParse("2.48.0")},
+	{semver.MustParse("0.31.0"), semver.MustParse("2.42.0")},
+	{semver.MustParse("0.30.0"), semver.MustParse("2.40.7")},
+	{semver.MustParse("0.28.0"), semver.MustParse("2.38.0")},
+	{semver.MustParse("0.24.0"), semver.MustParse("2.32.0")},
+}
+
+// PrometheusVersionForThanos returns the Prometheus version equivalent to the
+// given Thanos version.
+func PrometheusVersionForThanos(version semver.Version) semver.Version {
+	for _, e := range thanosPrometheusEquivalents {
+		if version.GTE(e.thanos) {
+			return e.prometheus
+		}
+	}
+
+	return thanosPrometheusEquivalents[len(thanosPrometheusEquivalents)-1].prometheus
+}

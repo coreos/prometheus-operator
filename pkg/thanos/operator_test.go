@@ -81,6 +81,58 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 			golden: "v0.24.0_remote_write_config_unsupported_fields.golden",
 		},
 		{
+			name:    "remote write with invalid write relabel config regex",
+			version: operator.DefaultThanosVersion,
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL: "http://example.com",
+					WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+						{
+							SourceLabels: []monitoringv1.LabelName{"__name__"},
+							Regex:        "(ab",
+							TargetLabel:  "job",
+							Action:       "replace",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:    "remote write with valid write relabel configs",
+			version: operator.DefaultThanosVersion,
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL: "http://example.com",
+					WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+						{
+							SourceLabels: []monitoringv1.LabelName{"__name__"},
+							TargetLabel:  "job",
+							Action:       "lowercase",
+						},
+					},
+				},
+			},
+			golden: "write_relabel_configs_remote_write_config.golden",
+		},
+		{
+			name:    "remote write with write relabel config action not supported by the thanos version",
+			version: "v0.24.0",
+			remoteWrite: []monitoringv1.RemoteWriteSpec{
+				{
+					URL: "http://example.com",
+					WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+						{
+							SourceLabels: []monitoringv1.LabelName{"__name__"},
+							TargetLabel:  "job",
+							Action:       "lowercase",
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
 			name:    "sigv4 external_id not support in any thanos version",
 			version: operator.DefaultThanosVersion,
 			remoteWrite: []monitoringv1.RemoteWriteSpec{

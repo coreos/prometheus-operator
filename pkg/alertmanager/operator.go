@@ -1548,7 +1548,7 @@ func checkDiscordConfigs(
 				return fmt.Errorf(`'username' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 			}
 			if ptr.Deref(config.AvatarURL, "") != "" {
-				return fmt.Errorf(`'avartarURL' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
+				return fmt.Errorf(`'avatarURL' is available in Alertmanager >= 0.28.0 only - current %s`, amVersion)
 			}
 		}
 

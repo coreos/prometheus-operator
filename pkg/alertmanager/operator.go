@@ -1576,11 +1576,11 @@ func checkRocketChatConfigs(
 			return err
 		}
 
-		if _, err := store.GetSecretKey(ctx, namespace, config.Token, validation.NotEmpty); err != nil {
+		if _, err := store.GetSecretKey(ctx, namespace, config.Token); err != nil {
 			return fmt.Errorf("failed to retrieve RocketChat token: %w", err)
 		}
 
-		if _, err := store.GetSecretKey(ctx, namespace, config.TokenID, validation.NotEmpty); err != nil {
+		if _, err := store.GetSecretKey(ctx, namespace, config.TokenID); err != nil {
 			return fmt.Errorf("failed to retrieve RocketChat token ID: %w", err)
 		}
 	}

@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authorization/v1"
@@ -2685,6 +2686,7 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 		amConfig *monitoringv1alpha1.AlertmanagerConfig
 		version  *semver.Version
 		ok       bool
+		errMsg   *string
 	}{
 		{
 			amConfig: newAMConfig("rocketchat-unsupported-version",
@@ -2695,6 +2697,7 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 			),
 			version: &version27,
 			ok:      false,
+			errMsg:  new(`'rocketChatConfigs' is available in Alertmanager >= 0.28.0 only - current 0.27.0`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-supported-version",
@@ -2739,7 +2742,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "token-id"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token: unable to get secret "not-existing": secrets "not-existing" not found`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-token-with-missing-key",
@@ -2748,7 +2752,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "token-id"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token: key "not-existing" in secret "secret" not found`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-token-with-empty-value",
@@ -2757,7 +2762,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "token-id"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token: value cannot be empty`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-token-id-with-missing-secret",
@@ -2766,7 +2772,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("not-existing", "token-id"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token ID: unable to get secret "not-existing": secrets "not-existing" not found`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-token-id-with-missing-key",
@@ -2775,7 +2782,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "not-existing"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token ID: key "not-existing" in secret "secret" not found`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-token-id-with-empty-value",
@@ -2784,7 +2792,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "empty"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token ID: value cannot be empty`),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-second-config-invalid",
@@ -2797,7 +2806,8 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 					TokenID: newSelector("secret", "empty"),
 				},
 			),
-			ok: false,
+			ok:     false,
+			errMsg: new(`failed to retrieve RocketChat token ID: value cannot be empty`),
 		},
 	} {
 		t.Run(tc.amConfig.Name, func(t *testing.T) {
@@ -2815,6 +2825,9 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 
 			t.Logf("err: %s", err)
 			require.Error(t, err)
+			if tc.errMsg != nil {
+				assert.EqualError(t, err, *tc.errMsg)
+			}
 		})
 	}
 }

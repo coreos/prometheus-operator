@@ -3321,40 +3321,39 @@ func (rc *rocketChatConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 			return fmt.Errorf("invalid 'api_url': %w", err)
 		}
 	}
-
-	type urlStruct struct {
-		URL       string
-		FieldName string
+	if rc.TitleLink != "" {
+		if err := validation.ValidateTemplateURL(rc.TitleLink); err != nil {
+			return fmt.Errorf("invalid 'title_link': %w", err)
+		}
 	}
 
-	v := func(u urlStruct) error {
-		if u.URL == "" {
-			return nil
+	if rc.IconURL != "" {
+		if err := validation.ValidateTemplateURL(rc.IconURL); err != nil {
+			return fmt.Errorf("invalid 'icon_url': %w", err)
 		}
-		if err := validation.ValidateTemplateURL(u.URL); err != nil {
-			return fmt.Errorf("invalid '%s': %w", u.FieldName, err)
-		}
-		return nil
 	}
 
-	for _, u := range []urlStruct{
-		{rc.TitleLink, "title_link"},
-		{rc.IconURL, "icon_url"},
-		{rc.ImageURL, "image_url"},
-		{rc.ThumbURL, "thumb_url"},
-	} {
-		if err := v(u); err != nil {
-			return err
+	if rc.ImageURL != "" {
+		if err := validation.ValidateTemplateURL(rc.ImageURL); err != nil {
+			return fmt.Errorf("invalid 'image_url': %w", err)
+		}
+	}
+
+	if rc.ThumbURL != "" {
+		if err := validation.ValidateTemplateURL(rc.ThumbURL); err != nil {
+			return fmt.Errorf("invalid 'thumb_url': %w", err)
 		}
 	}
 
 	for i, action := range rc.Actions {
-		for _, u := range []urlStruct{
-			{action.URL, "url"},
-			{action.ImageURL, "image_url"},
-		} {
-			if err := v(u); err != nil {
-				return fmt.Errorf("actions[%d]: %w", i, err)
+		if action.URL != "" {
+			if err := validation.ValidateTemplateURL(action.URL); err != nil {
+				return fmt.Errorf("invalid 'url' in actions[%d]: %w", i, err)
+			}
+		}
+		if action.ImageURL != "" {
+			if err := validation.ValidateTemplateURL(action.ImageURL); err != nil {
+				return fmt.Errorf("invalid 'image_url' in actions[%d]: %w", i, err)
 			}
 		}
 	}

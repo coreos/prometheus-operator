@@ -2752,7 +2752,7 @@ func TestCheckSNSAlertmanagerConfig(t *testing.T) {
 			if tc.version != nil {
 				amVersion = *tc.version
 			}
-			err := checkAlertmanagerConfigResource(context.Background(), tc.amConfig, amVersion, store)
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return

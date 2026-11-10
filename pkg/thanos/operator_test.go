@@ -97,8 +97,8 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 						},
 					},
 					ProxyConfig: monitoringv1.ProxyConfig{
-						ProxyURL: ptr.To("http://proxy:3128"),
-						NoProxy:  ptr.To(".internal"),
+						ProxyURL: new("http://proxy:3128"),
+						NoProxy:  new(".internal"),
 					},
 					QueueConfig: &monitoringv1.QueueConfig{
 						Capacity:       100,
@@ -107,7 +107,7 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 					},
 					AzureAD: &monitoringv1.AzureAD{
 						ManagedIdentity: &monitoringv1.ManagedIdentity{
-							ClientID: ptr.To("client-id"),
+							ClientID: new("client-id"),
 						},
 					},
 				},
@@ -127,7 +127,7 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 					},
 					AzureAD: &monitoringv1.AzureAD{
 						ManagedIdentity: &monitoringv1.ManagedIdentity{
-							ClientID: ptr.To("client-id"),
+							ClientID: new("client-id"),
 						},
 					},
 				},
@@ -142,7 +142,7 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 					URL: "http://example.com",
 					AzureAD: &monitoringv1.AzureAD{
 						SDK: &monitoringv1.AzureSDK{
-							TenantID: ptr.To("tenant"),
+							TenantID: new("tenant"),
 						},
 					},
 				},
@@ -165,8 +165,8 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 						},
 					},
 					ProxyConfig: monitoringv1.ProxyConfig{
-						ProxyURL: ptr.To("http://proxy:3128"),
-						NoProxy:  ptr.To(".internal"),
+						ProxyURL: new("http://proxy:3128"),
+						NoProxy:  new(".internal"),
 					},
 					QueueConfig: &monitoringv1.QueueConfig{
 						Capacity:       100,
@@ -175,7 +175,7 @@ func TestCreateOrUpdateRulerConfigSecret(t *testing.T) {
 					},
 					AzureAD: &monitoringv1.AzureAD{
 						SDK: &monitoringv1.AzureSDK{
-							TenantID: ptr.To("tenant"),
+							TenantID: new("tenant"),
 						},
 					},
 				},

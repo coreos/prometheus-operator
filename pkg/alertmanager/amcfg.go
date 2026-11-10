@@ -51,10 +51,10 @@ const (
 	// configuration. It expects the field name and the minimum version.
 	unsupportedFieldMsg = "'%s' supported in Alertmanager >= %s only - dropping field from provided config"
 
-	// unsupportedIntegrationErr is the error returned when a receiver
+	// unsupportedIntegrationErrMsg is the error returned when a receiver
 	// integration isn't supported by the Alertmanager version. It expects the
 	// integration name and the minimum version.
-	unsupportedIntegrationErr = "invalid syntax in receivers config; %s integration is available in Alertmanager >= %s"
+	unsupportedIntegrationErrMsg = "invalid syntax in receivers config; %s integration is available in Alertmanager >= %s"
 )
 
 // alertmanagerConfigFrom returns a valid alertmanagerConfig from b
@@ -3047,7 +3047,7 @@ func (whc *webhookConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 
 func (tc *msTeamsConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	if amVersion.LT(semver.MustParse("0.26.0")) {
-		return fmt.Errorf(unsupportedIntegrationErr, "msteams", "0.26.0")
+		return unsupportedIntegrationErr("msteams", "0.26.0")
 	}
 
 	if tc.WebhookURL == "" {
@@ -3069,7 +3069,7 @@ func (tc *msTeamsConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 func (tc *msTeamsV2Config) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	msTeamsV2Allowed := amVersion.GTE(semver.MustParse("0.28.0"))
 	if !msTeamsV2Allowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "msteams v2", "0.28.0")
+		return unsupportedIntegrationErr("msteams v2", "0.28.0")
 	}
 
 	if tc.WebhookURL == "" && len(tc.WebhookURLFile) == 0 {
@@ -3141,7 +3141,7 @@ func (tc *telegramConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	lessThanV0_31 := amVersion.LT(semver.MustParse("0.31.0"))
 
 	if !telegramAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "telegram", "0.24.0")
+		return unsupportedIntegrationErr("telegram", "0.24.0")
 	}
 
 	if tc.ChatIDFile != "" && lessThanV0_31 {
@@ -3193,7 +3193,7 @@ func (dc *discordConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 	lessThanV0_28 := amVersion.LT(semver.MustParse("0.28.0"))
 
 	if !discordAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "discord", "0.25.0")
+		return unsupportedIntegrationErr("discord", "0.25.0")
 	}
 
 	if dc.WebhookURLFile != "" && lessThanV0_28 {
@@ -3230,7 +3230,7 @@ func (dc *discordConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 func (tc *webexConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	webexAllowed := amVersion.GTE(semver.MustParse("0.25.0"))
 	if !webexAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "webex", "0.25.0")
+		return unsupportedIntegrationErr("webex", "0.25.0")
 	}
 
 	if tc.RoomID == "" {
@@ -3249,7 +3249,7 @@ func (tc *webexConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 func (jc *jiraConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	jiraConfigAllowed := amVersion.GTE(semver.MustParse("0.28.0"))
 	if !jiraConfigAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "jira", "0.28.0")
+		return unsupportedIntegrationErr("jira", "0.28.0")
 	}
 
 	if jc.Project == "" {
@@ -3282,7 +3282,7 @@ func (jc *jiraConfig) sanitize(amVersion semver.Version, logger *slog.Logger) er
 func (rc *rocketChatConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	rocketChatAllowed := amVersion.GTE(semver.MustParse("0.28.0"))
 	if !rocketChatAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "rocketchat", "0.28.0")
+		return unsupportedIntegrationErr("rocketchat", "0.28.0")
 	}
 
 	if rc.Token != nil && len(rc.TokenFile) > 0 {
@@ -3342,7 +3342,7 @@ func (mc *mattermostConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	mattermostAllowed := amVersion.GTE(semver.MustParse("0.30.0"))
 	lessThanV0_32 := amVersion.LT(semver.MustParse("0.32.0"))
 	if !mattermostAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "mattermost", "0.30.0")
+		return unsupportedIntegrationErr("mattermost", "0.30.0")
 	}
 
 	if mc.WebhookURL == "" && mc.WebhookURLFile == "" && lessThanV0_32 {
@@ -3451,7 +3451,7 @@ func (mc *mattermostConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 func (ic *incidentioConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	incidentioAllowed := amVersion.GTE(semver.MustParse("0.29.0"))
 	if !incidentioAllowed {
-		return fmt.Errorf(unsupportedIntegrationErr, "incident.io", "0.29.0")
+		return unsupportedIntegrationErr("incident.io", "0.29.0")
 	}
 
 	if ic.URL == "" && ic.URLFile == "" {
@@ -3898,4 +3898,8 @@ func warnUnsupportedField(
 ) {
 	msg := fmt.Sprintf(unsupportedFieldMsg, fieldName, supportedVersion.String())
 	logger.Warn(msg, "current_version", amVersion.String())
+}
+
+func unsupportedIntegrationErr(integration, version string) error {
+	return fmt.Errorf(unsupportedIntegrationErrMsg, integration, version)
 }

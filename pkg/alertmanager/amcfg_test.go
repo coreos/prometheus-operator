@@ -28,6 +28,7 @@ import (
 	"github.com/prometheus/alertmanager/timeinterval"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 	"gotest.tools/v3/golden"
@@ -1182,6 +1183,113 @@ func TestInitializeFromAlertmanagerConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:      "valid global config telegram bot token",
+			amVersion: &version31,
+			globalConfig: &monitoringv1.AlertmanagerGlobalConfig{
+				TelegramConfig: &monitoringv1.GlobalTelegramConfig{
+					BotToken: &corev1.SecretKeySelector{
+						Key: "bot-token",
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "telegram",
+						},
+					},
+				},
+			},
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "global-config",
+					Namespace: "mynamespace",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Receivers: []monitoringv1alpha1.Receiver{
+						{Name: "null"},
+						{Name: "myreceiver"},
+					},
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "null",
+						Routes: []apiextensionsv1.JSON{
+							{
+								Raw: myrouteJSON,
+							},
+						},
+					},
+				},
+			},
+			matcherStrategy: monitoringv1.AlertmanagerConfigMatcherStrategy{
+				Type: "OnNamespace",
+			},
+			golden: "valid_global_config_telegram_bot_token.golden",
+		},
+		{
+			name:      "invalid global config telegram bot token version not supported",
+			amVersion: &version28,
+			globalConfig: &monitoringv1.AlertmanagerGlobalConfig{
+				TelegramConfig: &monitoringv1.GlobalTelegramConfig{
+					BotToken: &corev1.SecretKeySelector{
+						Key: "bot-token",
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "telegram",
+						},
+					},
+				},
+			},
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "global-config",
+					Namespace: "mynamespace",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Receivers: []monitoringv1alpha1.Receiver{
+						{Name: "null"},
+						{Name: "myreceiver"},
+					},
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "null",
+						Routes: []apiextensionsv1.JSON{
+							{
+								Raw: myrouteJSON,
+							},
+						},
+					},
+				},
+			},
+			matcherStrategy: monitoringv1.AlertmanagerConfigMatcherStrategy{
+				Type: "OnNamespace",
+			},
+			wantErr: true,
+		},
+		{
+			name:      "invalid global config telegram bot token file version not supported",
+			amVersion: &version28,
+			globalConfig: &monitoringv1.AlertmanagerGlobalConfig{
+				TelegramConfig: &monitoringv1.GlobalTelegramConfig{
+					BotTokenFile: new("/global/bot/token/file"),
+				},
+			},
+			amConfig: &monitoringv1alpha1.AlertmanagerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "global-config",
+					Namespace: "mynamespace",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Receivers: []monitoringv1alpha1.Receiver{
+						{Name: "null"},
+						{Name: "myreceiver"},
+					},
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "null",
+						Routes: []apiextensionsv1.JSON{
+							{Raw: myrouteJSON},
+						},
+					},
+				},
+			},
+			matcherStrategy: monitoringv1.AlertmanagerConfigMatcherStrategy{
+				Type: "OnNamespace",
+			},
+			wantErr: true,
+		},
+		{
 			name:      "valid global config jira api url",
 			amVersion: &version28,
 			globalConfig: &monitoringv1.AlertmanagerGlobalConfig{
@@ -2246,6 +2354,15 @@ Z8Ja2z8jw1xUKxfurno8wsAgFAQLuUZ0sTpwHBtwzFEdIeaAHBbNkkuGq7leIw/u
 					"proxy-header": []byte("value"),
 				},
 			},
+			&corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "telegram",
+					Namespace: "mynamespace",
+				},
+				Data: map[string][]byte{
+					"bot-token": []byte("telegrambottoken123"),
+				},
+			},
 		)
 		cb := NewConfigBuilder(
 			newNopLogger(t),
@@ -2286,7 +2403,13 @@ func TestGenerateConfig(t *testing.T) {
 	version24, err := semver.ParseTolerant("v0.24.0")
 	require.NoError(t, err)
 
+	version26, err := semver.ParseTolerant("v0.26.0")
+	require.NoError(t, err)
+
 	version28, err := semver.ParseTolerant("v0.28.0")
+	require.NoError(t, err)
+
+	version31, err := semver.ParseTolerant("v0.31.0")
 	require.NoError(t, err)
 
 	globalSlackAPIURL, err := url.Parse("http://slack.example.com")
@@ -3134,7 +3257,8 @@ func TestGenerateConfig(t *testing.T) {
 			golden: "CR_with_WeChat_Receiver.golden",
 		},
 		{
-			name: "CR with Pushover Receiver",
+			name:      "CR with Pushover Receiver",
+			amVersion: &version26,
 			kclient: fake.NewClientset(
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -3189,6 +3313,8 @@ func TestGenerateConfig(t *testing.T) {
 								Retry:  new("5m"),
 								Expire: new("30s"),
 								HTML:   new(true),
+								Sound:  new("siren"),
+								Device: new("deviceone"),
 							}},
 						}},
 					},
@@ -3277,7 +3403,222 @@ func TestGenerateConfig(t *testing.T) {
 			golden: "CR_with_Telegram_Receiver.golden",
 		},
 		{
-
+			name:      "CR with Telegram Receiver BotToken Missing Secret",
+			amVersion: &version24,
+			kclient: fake.NewClientset(
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "am-telegram-test-receiver",
+						Namespace: "mynamespace",
+					},
+					Data: map[string][]byte{
+						"botToken": []byte("bipbop"),
+					},
+				},
+			),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL: ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								BotToken: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{
+										Name: "missing-secret",
+									},
+									Key: "botToken",
+								},
+								ChatID: 12345,
+							}},
+						}},
+					},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name:      "CR with Telegram Receiver BotTokenFile",
+			amVersion: &version26,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL:       ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								BotTokenFile: new("/bot/token/file"),
+								ChatID:       12345,
+							}},
+						}},
+					},
+				},
+			},
+			golden: "CR_with_Telegram_Receiver_BotTokenFile.golden",
+		},
+		{
+			name:      "CR with Telegram Receiver BotTokenFile unsupported version",
+			amVersion: &version24,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL:       ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								BotTokenFile: new("/bot/token/file"),
+								ChatID:       12345,
+							}},
+						}},
+					},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name:      "CR with Telegram Receiver using global BotToken",
+			amVersion: &version31,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Global: &globalConfig{
+					TelegramBotToken: "telegrambottoken12345abc",
+				},
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL: ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								ChatID: 12345,
+							}},
+						}},
+					},
+				},
+			},
+			golden: "CR_with_Telegram_Receiver_using_global_BotToken.golden",
+		},
+		{
+			name:      "CR with Telegram Receiver using global BotTokenFile",
+			amVersion: &version31,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Global: &globalConfig{
+					TelegramBotTokenFile: "/global/bot/token/file",
+				},
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL: ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								ChatID: 12345,
+							}},
+						}},
+					},
+				},
+			},
+			golden: "CR_with_Telegram_Receiver_using_global_BotTokenFile.golden",
+		},
+		{
+			name:      "CR with Telegram Receiver Missing Token",
+			amVersion: &version31,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{{
+							Name: "test",
+							TelegramConfigs: []monitoringv1alpha1.TelegramConfig{{
+								APIURL: ptr.To(monitoringv1alpha1.URL("https://api.telegram.org")),
+								ChatID: 12345,
+							}},
+						}},
+					},
+				},
+			},
+			expectedError: true,
+		},
+		{
 			name:    "CR with Slack Receiver and global Slack URL",
 			kclient: fake.NewClientset(),
 			baseConfig: alertmanagerConfig{
@@ -3937,108 +4278,6 @@ func TestGenerateConfig(t *testing.T) {
 			},
 			golden: "CR_with_Active_Time_Intervals.golden",
 		},
-		{
-			name:      "CR with MSTeamsV2 Receiver",
-			amVersion: &version28,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "ms-teams-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://prod-108.westeurope.logic.azure.com:443/workflows/id"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
-			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
-				"mynamespace": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myamc",
-						Namespace: "mynamespace",
-					},
-					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
-						Route: &monitoringv1alpha1.Route{
-							Receiver: "test",
-						},
-						Receivers: []monitoringv1alpha1.Receiver{
-							{
-								Name: "test",
-								MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
-									{
-										WebhookURL: &corev1.SecretKeySelector{
-											Key: "url",
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "ms-teams-secret",
-											},
-										},
-										Title: new("test title"),
-										Text:  new("test text"),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			golden: "CR_with_MSTeamsV2_Receiver.golden",
-		},
-		{
-			name:      "CR with MSTeamsV2 Receiver with Partial Conf",
-			amVersion: &version28,
-			kclient: fake.NewClientset(
-				&corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "ms-teams-secret",
-						Namespace: "mynamespace",
-					},
-					Data: map[string][]byte{
-						"url": []byte("https://prod-108.westeurope.logic.azure.com:443/workflows/id"),
-					},
-				},
-			),
-			baseConfig: alertmanagerConfig{
-				Route: &route{
-					Receiver: "null",
-				},
-				Receivers: []*receiver{{Name: "null"}},
-			},
-			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
-				"mynamespace": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "myamc",
-						Namespace: "mynamespace",
-					},
-					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
-						Route: &monitoringv1alpha1.Route{
-							Receiver: "test",
-						},
-						Receivers: []monitoringv1alpha1.Receiver{
-							{
-								Name: "test",
-								MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
-									{
-										WebhookURL: &corev1.SecretKeySelector{
-											Key: "url",
-											LocalObjectReference: corev1.LocalObjectReference{
-												Name: "ms-teams-secret",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			golden: "CR_with_MSTeamsV2_Receiver_Partial_Conf.golden",
-		},
 	}
 
 	logger := newNopLogger(t)
@@ -4279,6 +4518,303 @@ func TestGenerateConfigMSTeamsReceiver(t *testing.T) {
 				return
 			}
 			require.NoError(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+
+			cfgBytes, err := cb.MarshalJSON()
+			require.NoError(t, err)
+
+			// Verify the generated yaml is as expected
+			golden.Assert(t, string(cfgBytes), tc.golden)
+
+			// Verify the generated config is something that Alertmanager will be happy with
+			_, err = alertmanagerConfigFromBytes(cfgBytes)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGenerateConfigMSTeamsV2Receiver(t *testing.T) {
+	type testCase struct {
+		name            string
+		kclient         kubernetes.Interface
+		baseConfig      alertmanagerConfig
+		amVersion       *semver.Version
+		matcherStrategy monitoringv1.AlertmanagerConfigMatcherStrategy
+		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
+		golden          string
+		expectedError   bool
+	}
+
+	version28, err := semver.ParseTolerant("v0.28.0")
+	require.NoError(t, err)
+
+	testCases := []testCase{
+		{
+			name:      "CR with MSTeamsV2 Receiver",
+			amVersion: &version28,
+			kclient: fake.NewClientset(
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ms-teams-secret",
+						Namespace: "mynamespace",
+					},
+					Data: map[string][]byte{
+						"url": []byte("https://prod-108.westeurope.logic.azure.com:443/workflows/id"),
+					},
+				},
+			),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{
+							{
+								Name: "test",
+								MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
+									{
+										WebhookURL: &corev1.SecretKeySelector{
+											Key: "url",
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "ms-teams-secret",
+											},
+										},
+										Title: new("test title"),
+										Text:  new("test text"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "CR_with_MSTeamsV2_Receiver.golden",
+		},
+		{
+			name:      "CR with MSTeamsV2 Receiver with Partial Conf",
+			amVersion: &version28,
+			kclient: fake.NewClientset(
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "ms-teams-secret",
+						Namespace: "mynamespace",
+					},
+					Data: map[string][]byte{
+						"url": []byte("https://prod-108.westeurope.logic.azure.com:443/workflows/id"),
+					},
+				},
+			),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{
+							{
+								Name: "test",
+								MSTeamsV2Configs: []monitoringv1alpha1.MSTeamsV2Config{
+									{
+										WebhookURL: &corev1.SecretKeySelector{
+											Key: "url",
+											LocalObjectReference: corev1.LocalObjectReference{
+												Name: "ms-teams-secret",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "CR_with_MSTeamsV2_Receiver_Partial_Conf.golden",
+		},
+	}
+
+	logger := newNopLogger(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := assets.NewStoreBuilder(tc.kclient.CoreV1(), tc.kclient.CoreV1())
+
+			if tc.amVersion == nil {
+				version, err := semver.ParseTolerant("v0.22.2")
+				require.NoError(t, err)
+				tc.amVersion = &version
+			}
+
+			cb := NewConfigBuilder(logger, *tc.amVersion, store,
+				&monitoringv1.Alertmanager{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "alertmanager-namespace"},
+					Spec:       monitoringv1.AlertmanagerSpec{AlertmanagerConfigMatcherStrategy: tc.matcherStrategy},
+				},
+			)
+			cb.cfg = &tc.baseConfig
+
+			if tc.expectedError {
+				require.Error(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+				return
+			}
+			require.NoError(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+
+			cfgBytes, err := cb.MarshalJSON()
+			require.NoError(t, err)
+
+			// Verify the generated yaml is as expected
+			golden.Assert(t, string(cfgBytes), tc.golden)
+
+			// Verify the generated config is something that Alertmanager will be happy with
+			_, err = alertmanagerConfigFromBytes(cfgBytes)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGenerateConfigTelegramReceiver(t *testing.T) {
+	type testCase struct {
+		name            string
+		kclient         kubernetes.Interface
+		baseConfig      alertmanagerConfig
+		amVersion       *semver.Version
+		matcherStrategy monitoringv1.AlertmanagerConfigMatcherStrategy
+		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
+		golden          string
+		expectedError   bool
+		errMsg          *string
+	}
+
+	version25, err := semver.ParseTolerant("v0.25.0")
+	require.NoError(t, err)
+
+	version26, err := semver.ParseTolerant("v0.26.0")
+	require.NoError(t, err)
+
+	testCases := []testCase{
+		{
+			name:      "CR with Telegram Missing botToken",
+			amVersion: &version25,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{
+							{
+								Name: "test",
+								TelegramConfigs: []monitoringv1alpha1.TelegramConfig{
+									{
+										ChatID: 1234,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: true,
+			errMsg:        new(`AlertmanagerConfig mynamespace/myamc: TelegramConfig[0]: missing mandatory field 'botToken'`),
+		},
+		{
+			name:      "CR with Telegram Missing botToken and botTokenFile",
+			amVersion: &version26,
+			kclient:   fake.NewClientset(),
+			baseConfig: alertmanagerConfig{
+				Route: &route{
+					Receiver: "null",
+				},
+				Receivers: []*receiver{{Name: "null"}},
+			},
+			amConfigs: map[string]*monitoringv1alpha1.AlertmanagerConfig{
+				"mynamespace": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "myamc",
+						Namespace: "mynamespace",
+					},
+					Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+						Route: &monitoringv1alpha1.Route{
+							Receiver: "test",
+						},
+						Receivers: []monitoringv1alpha1.Receiver{
+							{
+								Name: "test",
+								TelegramConfigs: []monitoringv1alpha1.TelegramConfig{
+									{
+										ChatID: 1234,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: true,
+			errMsg:        new(`AlertmanagerConfig mynamespace/myamc: TelegramConfig[0]: missing mandatory field 'botToken' or 'botTokenFile'`),
+		},
+	}
+
+	logger := newNopLogger(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := assets.NewStoreBuilder(tc.kclient.CoreV1(), tc.kclient.CoreV1())
+
+			if tc.amVersion == nil {
+				version, err := semver.ParseTolerant("v0.22.2")
+				require.NoError(t, err)
+				tc.amVersion = &version
+			}
+
+			cb := NewConfigBuilder(logger, *tc.amVersion, store,
+				&monitoringv1.Alertmanager{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "alertmanager-namespace"},
+					Spec:       monitoringv1.AlertmanagerSpec{AlertmanagerConfigMatcherStrategy: tc.matcherStrategy},
+				},
+			)
+			cb.cfg = &tc.baseConfig
+
+			err := cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs)
+
+			if tc.expectedError {
+				require.Error(t, err)
+				t.Logf("err: %s", err)
+				if tc.errMsg != nil {
+					assert.EqualError(t, err, *tc.errMsg)
+					return
+				}
+				return
+			}
+			require.NoError(t, err)
 
 			cfgBytes, err := cb.MarshalJSON()
 			require.NoError(t, err)
@@ -4833,6 +5369,209 @@ func TestGenerateConfigEmailReceiver(t *testing.T) {
 
 			if tc.amVersion == nil {
 				version, err := semver.ParseTolerant("v0.22.2")
+				require.NoError(t, err)
+				tc.amVersion = &version
+			}
+
+			cb := NewConfigBuilder(logger, *tc.amVersion, store,
+				&monitoringv1.Alertmanager{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "alertmanager-namespace"},
+					Spec:       monitoringv1.AlertmanagerSpec{AlertmanagerConfigMatcherStrategy: tc.matcherStrategy},
+				},
+			)
+			cb.cfg = &tc.baseConfig
+
+			if tc.expectedError {
+				require.Error(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+				return
+			}
+			require.NoError(t, cb.AddAlertmanagerConfigs(context.Background(), tc.amConfigs))
+
+			cfgBytes, err := cb.MarshalJSON()
+			require.NoError(t, err)
+
+			// Verify the generated yaml is as expected
+			golden.Assert(t, string(cfgBytes), tc.golden)
+
+			// Verify the generated config is something that Alertmanager will be happy with
+			_, err = alertmanagerConfigFromBytes(cfgBytes)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestGenerateConfigRocketChatReceiver(t *testing.T) {
+	type testCase struct {
+		name            string
+		kclient         kubernetes.Interface
+		baseConfig      alertmanagerConfig
+		amVersion       *semver.Version
+		matcherStrategy monitoringv1.AlertmanagerConfigMatcherStrategy
+		amConfigs       map[string]*monitoringv1alpha1.AlertmanagerConfig
+		golden          string
+		expectedError   bool
+	}
+
+	version28, err := semver.ParseTolerant("v0.28.0")
+	require.NoError(t, err)
+
+	rocketChatSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rocketchat-secret",
+			Namespace: "mynamespace",
+		},
+		Data: map[string][]byte{
+			"token":   []byte("my-token"),
+			"tokenID": []byte("my-token-id"),
+		},
+	}
+
+	tokenSelector := corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat-secret"},
+		Key:                  "token",
+	}
+	tokenIDSelector := corev1.SecretKeySelector{
+		LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat-secret"},
+		Key:                  "tokenID",
+	}
+
+	baseCfg := func() alertmanagerConfig {
+		return alertmanagerConfig{
+			Route: &route{
+				Receiver: "null",
+			},
+			Receivers: []*receiver{{Name: "null"}},
+		}
+	}
+
+	amConfigWith := func(rc ...monitoringv1alpha1.RocketChatConfig) map[string]*monitoringv1alpha1.AlertmanagerConfig {
+		return map[string]*monitoringv1alpha1.AlertmanagerConfig{
+			"mynamespace": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "myamc",
+					Namespace: "mynamespace",
+				},
+				Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+					Route: &monitoringv1alpha1.Route{
+						Receiver: "test",
+					},
+					Receivers: []monitoringv1alpha1.Receiver{{
+						Name:              "test",
+						RocketChatConfigs: rc,
+					}},
+				},
+			},
+		}
+	}
+
+	testCases := []testCase{
+		{
+			name:       "CR with RocketChatConfig with required fields",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				Token:   tokenSelector,
+				TokenID: tokenIDSelector,
+			}),
+			golden: "CR_with_RocketChatConfig_Required_Fields.golden",
+		},
+		{
+			name:       "CR with RocketChatConfig with all fields",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				SendResolved: new(true),
+				APIURL:       new(monitoringv1alpha1.URL("https://rocketchat.example.com")),
+				Channel:      new("#alerts"),
+				Token:        tokenSelector,
+				TokenID:      tokenIDSelector,
+				Color:        new("red"),
+				Emoji:        new(":warning:"),
+				IconURL:      new("https://example.com/icon.png"),
+				Text:         new("{{ .CommonAnnotations.description }}"),
+				Title:        new("{{ .CommonLabels.alertname }}"),
+				TitleLink:    new("https://example.com/alerts"),
+				Fields: []monitoringv1alpha1.RocketChatFieldConfig{
+					{
+						Short: new(true),
+						Title: new("Severity"),
+						Value: new("{{ .CommonLabels.severity }}"),
+					},
+					{
+						Title: new("Instance"),
+						Value: new("{{ .CommonLabels.instance }}"),
+					},
+				},
+				ShortFields: new(true),
+				ImageURL:    new("https://example.com/image.png"),
+				ThumbURL:    new("https://example.com/thumb.png"),
+				LinkNames:   new(true),
+			}),
+			golden: "CR_with_RocketChatConfig_All_Fields.golden",
+		},
+		{
+			name:       "CR with RocketChatConfig with send resolved disabled",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				SendResolved: new(false),
+				Channel:      new("#alerts"),
+				Token:        tokenSelector,
+				TokenID:      tokenIDSelector,
+			}),
+			golden: "CR_with_RocketChatConfig_Send_Resolved_Disabled.golden",
+		},
+		{
+			name:       "CR with RocketChatConfig missing token secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				Token:   tokenSelector,
+				TokenID: tokenIDSelector,
+			}),
+			expectedError: true,
+		},
+		{
+			name:       "CR with RocketChatConfig missing token key in secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				Token: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat-secret"},
+					Key:                  "nonexistent",
+				},
+				TokenID: tokenIDSelector,
+			}),
+			expectedError: true,
+		},
+		{
+			name:       "CR with RocketChatConfig missing token ID key in secret",
+			amVersion:  &version28,
+			kclient:    fake.NewClientset(rocketChatSecret),
+			baseConfig: baseCfg(),
+			amConfigs: amConfigWith(monitoringv1alpha1.RocketChatConfig{
+				Token: tokenSelector,
+				TokenID: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat-secret"},
+					Key:                  "nonexistent",
+				},
+			}),
+			expectedError: true,
+		},
+	}
+
+	logger := newNopLogger(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := assets.NewStoreBuilder(tc.kclient.CoreV1(), tc.kclient.CoreV1())
+
+			if tc.amVersion == nil {
+				version, err := semver.ParseTolerant("v0.28.0")
 				require.NoError(t, err)
 				tc.amVersion = &version
 			}
@@ -7741,6 +8480,159 @@ func TestSanitizePagerDutyConfig(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name:           "Test invalid url returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								URL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "Test invalid client_url returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								ClientURL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "Test invalid image src returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								Images: []pagerdutyImage{
+									{Src: "not-a-valid-url"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "Test invalid image href returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								Images: []pagerdutyImage{
+									{Href: "not-a-valid-url"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "Test invalid link href returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								Links: []pagerdutyLink{
+									{Href: "not-a-valid-url"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "Test valid urls pass validation",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								URL:       "https://events.pagerduty.com/v2/enqueue",
+								ClientURL: "https://example.com/client",
+								Images: []pagerdutyImage{
+									{
+										Src:  "https://example.com/image.png",
+										Href: "https://example.com/link",
+									},
+								},
+								Links: []pagerdutyLink{
+									{Href: "https://example.com/docs"},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "test_valid_urls_pass_validation_in_pagerduty_config.golden",
+		},
+		{
+			name:           "Test templated urls pass validation",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								ClientURL: `{{ .CommonAnnotations.client }}`,
+								Images: []pagerdutyImage{
+									{
+										Src:  `{{ .CommonAnnotations.image }}`,
+										Href: `{{ .CommonAnnotations.link }}`,
+									},
+								},
+								Links: []pagerdutyLink{
+									{Href: `{{ .CommonAnnotations.docs }}`},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "test_templated_urls_pass_validation_in_pagerduty_config.golden",
+		},
+		{
+			name:           "Test invalid template in client_url returns error",
+			againstVersion: semver.Version{Major: 0, Minor: 25},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						PagerdutyConfigs: []*pagerdutyConfig{
+							{
+								ClientURL: `{{ .CommonAnnotations.client`,
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.in.sanitize(tc.againstVersion, logger)
@@ -8160,6 +9052,195 @@ func TestSanitizeRocketChatConfig(t *testing.T) {
 								APIURL:      "http://example.com",
 								TokenID:     new("t123456"),
 								TokenIDFile: "/var/kubernetes/secrets/token-id",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid api_url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid title_link returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:    "http://example.com",
+								TitleLink: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid icon_url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:  "http://example.com",
+								IconURL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid image_url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:   "http://example.com",
+								ImageURL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid thumb_url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:   "http://example.com",
+								ThumbURL: "not-a-valid-url",
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid action url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL: "http://example.com",
+								Actions: []*rocketchatAttachmentAction{
+									{URL: "not-a-valid-url"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs invalid action image_url returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL: "http://example.com",
+								Actions: []*rocketchatAttachmentAction{
+									{ImageURL: "not-a-valid-url"},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:           "rocketchat_configs valid urls pass validation",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:    "https://rocket.example.com/hooks/xxx",
+								TitleLink: "https://example.com/title",
+								IconURL:   "https://example.com/icon.png",
+								ImageURL:  "https://example.com/image.png",
+								ThumbURL:  "https://example.com/thumb.png",
+								Actions: []*rocketchatAttachmentAction{
+									{
+										URL:      "https://example.com/action",
+										ImageURL: "https://example.com/action-image.png",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "rocketchat_valid_urls_pass_validation.golden",
+		},
+		{
+			name:           "rocketchat_configs templated urls pass validation",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								TitleLink: `{{ .CommonAnnotations.link }}`,
+								IconURL:   `{{ .CommonAnnotations.icon }}`,
+								ImageURL:  `{{ .CommonAnnotations.image }}`,
+								ThumbURL:  `{{ .CommonAnnotations.thumb }}`,
+								Actions: []*rocketchatAttachmentAction{
+									{
+										URL:      `{{ .CommonAnnotations.action }}`,
+										ImageURL: `{{ .CommonAnnotations.actionImage }}`,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			golden: "rocketchat_templated_urls_pass_validation.golden",
+		},
+		{
+			name:           "rocketchat_configs invalid template in title_link returns error",
+			againstVersion: versionRocketChatAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								TitleLink: `{{ .CommonAnnotations.link`,
 							},
 						},
 					},
@@ -8693,6 +9774,9 @@ func TestSanitizeRoute(t *testing.T) {
 	matcherV2SyntaxAllowed := semver.Version{Major: 0, Minor: 22}
 	matcherV2SyntaxNotAllowed := semver.Version{Major: 0, Minor: 21}
 
+	labelsNotAllowed := semver.Version{Major: 0, Minor: 33}
+	labelsAllowed := semver.Version{Major: 0, Minor: 34}
+
 	namespaceLabel := "namespace"
 	namespaceValue := "test-ns"
 
@@ -8757,6 +9841,38 @@ func TestSanitizeRoute(t *testing.T) {
 				},
 			},
 			golden: "test_route_with_new_syntax_supported_with_child_routes.golden",
+		},
+		{
+			name:           "Test route with labels unsupported version",
+			againstVersion: labelsNotAllowed,
+			in: &route{
+				Receiver: "test",
+				Match: map[string]string{
+					"some": "value",
+				},
+				Matchers: []string{fmt.Sprintf("%s=%s", namespaceLabel, namespaceValue)},
+				Continue: true,
+				Labels: map[string]string{
+					"label1": "value1",
+				},
+			},
+			golden: "test_route_with_labels_unsupported_version.golden",
+		},
+		{
+			name:           "Test route with labels supported version",
+			againstVersion: labelsAllowed,
+			in: &route{
+				Receiver: "test",
+				Match: map[string]string{
+					"some": "value",
+				},
+				Matchers: []string{fmt.Sprintf("%s=%s", namespaceLabel, namespaceValue)},
+				Continue: true,
+				Labels: map[string]string{
+					"label1": "value1",
+				},
+			},
+			golden: "test_route_with_labels_supported_version.golden",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -10071,6 +11187,83 @@ func TestSanitizeSlackConfig(t *testing.T) {
 
 				golden.Assert(t, string(amConfigs), tc.golden)
 			}
+		})
+	}
+}
+
+func TestConvertRouteWithLabels(t *testing.T) {
+	cb := NewConfigBuilder(
+		newNopLogger(t),
+		semver.MustParse("0.34.0"),
+		assets.NewStoreBuilder(nil, nil),
+		&monitoringv1.Alertmanager{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "alertmanager-namespace"},
+		},
+	)
+
+	tests := []struct {
+		name           string
+		route          *monitoringv1alpha1.Route
+		expectedLabels map[string]string
+	}{
+		{
+			name: "nil route returns nil",
+		},
+		{
+			name: "route without labels",
+			route: &monitoringv1alpha1.Route{
+				Receiver: "test-receiver",
+			},
+		},
+		{
+			name: "route with empty labels",
+			route: &monitoringv1alpha1.Route{
+				Receiver: "test-receiver",
+				Labels:   []monitoringv1alpha1.KeyValue{},
+			},
+		},
+		{
+			name: "route with simple labels",
+			route: &monitoringv1alpha1.Route{
+				Receiver: "test-receiver",
+				Labels: []monitoringv1alpha1.KeyValue{
+					{Key: "severity", Value: "critical"},
+					{Key: "team", Value: "platform"},
+				},
+			},
+			expectedLabels: map[string]string{
+				"severity": "critical",
+				"team":     "platform",
+			},
+		},
+		{
+			name: "route with template labels",
+			route: &monitoringv1alpha1.Route{
+				Receiver: "test-receiver",
+				Labels: []monitoringv1alpha1.KeyValue{
+					{Key: "environment", Value: "{{ .Labels.env }}"},
+					{Key: "region", Value: "{{ .ExternalLabels.region }}"},
+				},
+			},
+			expectedLabels: map[string]string{
+				"environment": "{{ .Labels.env }}",
+				"region":      "{{ .ExternalLabels.region }}",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			crKey := types.NamespacedName{Name: "test", Namespace: "default"}
+			got := cb.convertRoute(tc.route, crKey)
+
+			if tc.route == nil {
+				require.Nil(t, got)
+				return
+			}
+
+			require.NotNil(t, got)
+			require.Equal(t, tc.expectedLabels, got.Labels)
 		})
 	}
 }

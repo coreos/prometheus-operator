@@ -71,6 +71,8 @@ const (
 	alertmanagerStorageDir = "/alertmanager"
 
 	defaultTerminationGracePeriodSeconds = int64(120)
+
+	clusterTLSRevisionHashKey = "operator.prometheus.io/cluster-tls-revision-hash"
 )
 
 var (
@@ -122,11 +124,7 @@ func getServiceName(a *monitoringv1.Alertmanager) string {
 	return ptr.Deref(a.Spec.ServiceName, defaultOperatedServiceName)
 }
 
-func makeStatefulSet(logger *slog.Logger, am *monitoringv1.Alertmanager, config Config, inputHash string, tlsSecrets *operator.ShardedSecret) (*appsv1.StatefulSet, error) {
-	// TODO(fabxc): is this the right point to inject defaults?
-	// Ideally we would do it before storing but that's currently not possible.
-	// Potentially an update handler on first insertion.
-
+func makeStatefulSet(logger *slog.Logger, am *monitoringv1.Alertmanager, config Config, inputHash string, clusterTLSConfigHash string, tlsSecrets *operator.ShardedSecret) (*appsv1.StatefulSet, error) {
 	if am.Spec.PortName == "" {
 		am.Spec.PortName = defaultPortName
 	}
@@ -148,7 +146,7 @@ func makeStatefulSet(logger *slog.Logger, am *monitoringv1.Alertmanager, config 
 		am.Spec.Resources.Requests[corev1.ResourceMemory] = resource.MustParse("200Mi")
 	}
 
-	spec, err := makeStatefulSetSpec(logger, am, config, tlsSecrets)
+	spec, err := makeStatefulSetSpec(logger, am, config, clusterTLSConfigHash, tlsSecrets)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +266,7 @@ func makeStatefulSetService(a *monitoringv1.Alertmanager, config Config) *corev1
 	return svc
 }
 
-func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, config Config, tlsSecrets *operator.ShardedSecret) (*appsv1.StatefulSetSpec, error) {
+func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, config Config, clusterTLSConfigHash string, tlsSecrets *operator.ShardedSecret) (*appsv1.StatefulSetSpec, error) {
 	amVersion := operator.StringValOrDefault(a.Spec.Version, operator.DefaultAlertmanagerVersion)
 	amImagePath, err := operator.BuildImagePath(
 		ptr.Deref(a.Spec.Image, ""),
@@ -329,6 +327,10 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 
 	if version.GTE(semver.MustParse("0.17.0")) && web != nil && web.Timeout != nil {
 		amArgs = append(amArgs, monitoringv1.Argument{Name: "web.timeout", Value: fmt.Sprintf("%d", *web.Timeout)})
+	}
+
+	if version.GTE(semver.MustParse("0.34.2")) && web != nil && web.CORSOrigin != nil {
+		amArgs = append(amArgs, monitoringv1.Argument{Name: "web.cors.origin", Value: *web.CORSOrigin})
 	}
 
 	limits := a.Spec.Limits
@@ -458,6 +460,7 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 	maps.Copy(podLabels, podSelectorLabels)
 
 	podAnnotations[operator.DefaultContainerAnnotationKey] = "alertmanager"
+	podAnnotations[clusterTLSRevisionHashKey] = clusterTLSConfigHash
 
 	var operatorInitContainers []corev1.Container
 

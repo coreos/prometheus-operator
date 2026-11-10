@@ -3,8 +3,8 @@
   "kind": "CustomResourceDefinition",
   "metadata": {
     "annotations": {
-      "controller-gen.kubebuilder.io/version": "v0.22.0",
-      "operator.prometheus.io/version": "0.94.0"
+      "controller-gen.kubebuilder.io/version": "v0.23.0",
+      "operator.prometheus.io/version": "0.95.1"
     },
     "name": "prometheuses.monitoring.coreos.com"
   },
@@ -3485,6 +3485,10 @@
                   "externalUrl": {
                     "description": "externalUrl defines the external URL under which the Prometheus service is externally\navailable. This is necessary to generate correct URLs (for instance if\nPrometheus is accessible behind an Ingress resource).",
                     "type": "string"
+                  },
+                  "extraScrapeMetrics": {
+                    "description": "extraScrapeMetrics defines whether to store additional time series for each scrape:\n`scrape_timeout_seconds`, `scrape_sample_limit` and `scrape_body_size_bytes`.\nThese metrics help monitor how close targets are to their configured limits.\n\nIt requires Prometheus >= v2.32.0.",
+                    "type": "boolean"
                   },
                   "hostAliases": {
                     "description": "hostAliases defines the optional list of hosts and IPs that will be injected into the Pod's\nhosts file if specified.",
@@ -8735,6 +8739,7 @@
                                         },
                                         "reason": {
                                           "description": "reason is a brief CamelCase machine-parseable reason.\nTogether with status it forms the unique identity of a condition entry.\nMaximum permitted length of a reason is 256 bytes.",
+                                          "minLength": 1,
                                           "type": "string"
                                         },
                                         "status": {
@@ -8744,6 +8749,7 @@
                                             "Degraded",
                                             "Inaccessible"
                                           ],
+                                          "minLength": 1,
                                           "type": "string"
                                         }
                                       },
@@ -8753,6 +8759,7 @@
                                       ],
                                       "type": "object"
                                     },
+                                    "maxItems": 16,
                                     "type": "array",
                                     "x-kubernetes-list-map-keys": [
                                       "status",
@@ -11446,6 +11453,13 @@
                           },
                           "clientAuthType": {
                             "description": "clientAuthType defines the server policy for client TLS authentication.\n\nFor more detail on clientAuth options:\nhttps://golang.org/pkg/crypto/tls/#ClientAuthType",
+                            "enum": [
+                              "NoClientCert",
+                              "RequestClientCert",
+                              "RequireAnyClientCert",
+                              "VerifyClientCertIfGiven",
+                              "RequireAndVerifyClientCert"
+                            ],
                             "type": "string"
                           },
                           "clientCAFile": {

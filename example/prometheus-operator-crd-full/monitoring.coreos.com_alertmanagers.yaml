@@ -3,8 +3,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.22.0
-    operator.prometheus.io/version: 0.94.0
+    controller-gen.kubebuilder.io/version: v0.23.0
+    operator.prometheus.io/version: 0.95.1
   name: alertmanagers.monitoring.coreos.com
 spec:
   group: monitoring.coreos.com
@@ -1018,6 +1018,30 @@ spec:
                         x-kubernetes-list-type: atomic
                     type: object
                 type: object
+              alertmanagerConfigFileSystemMode:
+                description: |-
+                  alertmanagerConfigFileSystemMode defines how the operator handles
+                  AlertmanagerConfig resources which have references to the Alertmanager
+                  container's filesystem (as opposed to secret key references). Users
+                  controlling the receiver's service may create an AlertmanagerConfig
+                  resource with a reference to a container's file (for instance using
+                  `botTokenFile` for the Telegram receiver) and exfiltrate sensitive
+                  content from files located in the Alertmanager container.
+
+                  Supported values are:
+                  - "DenyAll" denies any AlertmanagerConfig resource referencing files from the container's filesystem, non-compliant resources are rejected.
+                  - "FromAlertmanagerConfigMatcherStrategy" uses the `alertmanagerConfigNamespaceSelector` field to make a decision
+                    - When `alertmanagerConfigNamespaceSelector` is "None", it is equivalent to "AllowAll"
+                    - When `alertmanagerConfigNamespaceSelector` is "OnNamespaceExceptForAlertmanagerNamespace", it is equivalent to "AllowAll" for the AlertmanagerConfig resources located in the Alertmanager's namespace and "DenyAll" for all other resources.
+                    - When `alertmanagerConfigNamespaceSelector` is "OnNamespace", it is equivalent to "AllowAll" for the main AlertmanagerConfig resource (defined in `.spec.alertmanagerConfig.name`) and "DenyAll" for all other resources.
+                  - "AllowAll" allows any AlertmanagerConfig resource to reference files from the container's filesystem (use with caution).
+
+                  By default, the operator uses the "FromAlertmanagerConfigMatcherStrategy" mode.
+                enum:
+                - AllowAll
+                - FromAlertmanagerConfigMatcherStrategy
+                - DenyAll
+                type: string
               alertmanagerConfigMatcherStrategy:
                 description: |-
                   alertmanagerConfigMatcherStrategy defines how AlertmanagerConfig objects
@@ -2335,7 +2359,44 @@ spec:
                               It requires Alertmanager >= v0.24.0.
                             pattern: ^(http|https)://.+$
                             type: string
+                          botToken:
+                            description: |-
+                              botToken represents the bot token configuration for Telegram.
+                              It is mutually exclusive with `botTokenFile`.
+                              It requires Alertmanager >= v0.31.0.
+                            properties:
+                              key:
+                                description: The key of the secret to select from.  Must
+                                  be a valid secret key.
+                                type: string
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              optional:
+                                description: Specify whether the Secret or its key
+                                  must be defined
+                                type: boolean
+                            required:
+                            - key
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          botTokenFile:
+                            description: |-
+                              botTokenFile defines the file to read the Telegram bot token from.
+                              It is mutually exclusive with `botToken`.
+                              It requires Alertmanager >= v0.31.0.
+                            minLength: 1
+                            type: string
                         type: object
+                        x-kubernetes-validations:
+                        - message: botToken and botTokenFile are mutually exclusive.
+                          rule: '!has(self.botToken) || !has(self.botTokenFile)'
                       victorops:
                         description: victorops defines the default configuration for
                           VictorOps.
@@ -2865,6 +2926,12 @@ spec:
 
                           For more detail on clientAuth options:
                           https://golang.org/pkg/crypto/tls/#ClientAuthType
+                        enum:
+                        - NoClientCert
+                        - RequestClientCert
+                        - RequireAnyClientCert
+                        - VerifyClientCertIfGiven
+                        - RequireAndVerifyClientCert
                         type: string
                       clientCAFile:
                         description: |-
@@ -7534,6 +7601,7 @@ spec:
                                         reason is a brief CamelCase machine-parseable reason.
                                         Together with status it forms the unique identity of a condition entry.
                                         Maximum permitted length of a reason is 256 bytes.
+                                      minLength: 1
                                       type: string
                                     status:
                                       description: |-
@@ -7546,11 +7614,13 @@ spec:
                                       - DataLoss
                                       - Degraded
                                       - Inaccessible
+                                      minLength: 1
                                       type: string
                                   required:
                                   - reason
                                   - status
                                   type: object
+                                maxItems: 16
                                 type: array
                                 x-kubernetes-list-map-keys:
                                 - status
@@ -9959,6 +10029,17 @@ spec:
                 description: web defines the web command line flags when starting
                   Alertmanager.
                 properties:
+                  corsOrigin:
+                    description: |-
+                      corsOrigin is a fully anchored regular expression matching the origins
+                      allowed to call the API from a browser. This corresponds to the
+                      Alertmanager's `--web.cors.origin` flag.
+                      It requires Alertmanager >= v0.34.2.
+                    minLength: 1
+                    type: string
+                    x-kubernetes-validations:
+                    - message: corsOrigin must be a valid regular expression
+                      rule: '''''.matches(''^(?:''+self+'')$'') || !''''.matches(''^(?:''+self+'')$'')'
                   getConcurrency:
                     description: |-
                       getConcurrency defines the maximum number of GET requests processed concurrently. This corresponds to the
@@ -10173,6 +10254,12 @@ spec:
 
                           For more detail on clientAuth options:
                           https://golang.org/pkg/crypto/tls/#ClientAuthType
+                        enum:
+                        - NoClientCert
+                        - RequestClientCert
+                        - RequireAnyClientCert
+                        - VerifyClientCertIfGiven
+                        - RequireAndVerifyClientCert
                         type: string
                       clientCAFile:
                         description: |-

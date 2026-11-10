@@ -1714,6 +1714,7 @@ func (cg *ConfigGenerator) generatePodMonitorConfig(
 	metricRelabelings := []monitoringv1.RelabelConfig{}
 	metricRelabelings = append(metricRelabelings, scrapeClass.MetricRelabelings...)
 	metricRelabelings = append(metricRelabelings, labeler.GetRelabelingConfigs(m.TypeMeta, m.ObjectMeta, ep.MetricRelabelConfigs)...)
+	metricRelabelings = append(metricRelabelings, cpf.EnforceMetricRelabelings...)
 
 	if len(metricRelabelings) > 0 {
 		cfg = append(cfg, yaml.MapItem{Key: "metric_relabel_configs", Value: generateRelabelConfig(metricRelabelings)})
@@ -1969,6 +1970,7 @@ func (cg *ConfigGenerator) generateProbeConfig(
 	metricRelabelings := []monitoringv1.RelabelConfig{}
 	metricRelabelings = append(metricRelabelings, scrapeClass.MetricRelabelings...)
 	metricRelabelings = append(metricRelabelings, labeler.GetRelabelingConfigs(m.TypeMeta, m.ObjectMeta, m.Spec.MetricRelabelConfigs)...)
+	metricRelabelings = append(metricRelabelings, cpf.EnforceMetricRelabelings...)
 
 	if len(metricRelabelings) > 0 {
 		cfg = append(cfg, yaml.MapItem{Key: "metric_relabel_configs", Value: generateRelabelConfig(metricRelabelings)})
@@ -2263,6 +2265,7 @@ func (cg *ConfigGenerator) generateServiceMonitorConfig(
 	metricRelabelings := []monitoringv1.RelabelConfig{}
 	metricRelabelings = append(metricRelabelings, scrapeClass.MetricRelabelings...)
 	metricRelabelings = append(metricRelabelings, labeler.GetRelabelingConfigs(m.TypeMeta, m.ObjectMeta, ep.MetricRelabelConfigs)...)
+	metricRelabelings = append(metricRelabelings, cpf.EnforceMetricRelabelings...)
 
 	if len(metricRelabelings) > 0 {
 		cfg = append(cfg, yaml.MapItem{Key: "metric_relabel_configs", Value: generateRelabelConfig(metricRelabelings)})
@@ -5119,6 +5122,7 @@ func (cg *ConfigGenerator) generateScrapeConfig(
 	metricRelabelings := []monitoringv1.RelabelConfig{}
 	metricRelabelings = append(metricRelabelings, scrapeClass.MetricRelabelings...)
 	metricRelabelings = append(metricRelabelings, labeler.GetRelabelingConfigs(sc.TypeMeta, sc.ObjectMeta, sc.Spec.MetricRelabelConfigs)...)
+	metricRelabelings = append(metricRelabelings, cpf.EnforceMetricRelabelings...)
 
 	if len(metricRelabelings) > 0 {
 		cfg = append(cfg, yaml.MapItem{Key: "metric_relabel_configs", Value: generateRelabelConfig(metricRelabelings)})

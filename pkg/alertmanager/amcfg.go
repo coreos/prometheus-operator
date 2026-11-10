@@ -2256,8 +2256,7 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.SMTPTLSConfig != nil && amVersion.LT(semver.MustParse("0.28.0")) {
-		msg := "'smtp_tls_config' supported in Alertmanager >= 0.28.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "smtp_tls_config", amVersion, semver.MustParse("0.28.0"))
 		gc.SMTPTLSConfig = nil
 	}
 
@@ -2271,27 +2270,23 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 		}
 
 		if amVersion.LT(semver.MustParse("0.22.0")) {
-			msg := "'slack_api_url_file' supported in Alertmanager >= 0.22.0 only - dropping field from provided config"
-			logger.Warn(msg, "current_version", amVersion.String())
+			warnUnsupportedField(logger, "slack_api_url_file", amVersion, semver.MustParse("0.22.0"))
 			gc.SlackAPIURLFile = ""
 		}
 	}
 
 	if gc.SlackAppToken != "" && amVersion.LT(semver.MustParse("0.30.0")) {
-		msg := "'slack_app_token' supported in Alertmanager >= 0.30.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "slack_app_token", amVersion, semver.MustParse("0.30.0"))
 		gc.SlackAppToken = ""
 	}
 
 	if gc.SlackAppTokenFile != "" && amVersion.LT(semver.MustParse("0.30.0")) {
-		msg := "'slack_app_token_file' supported in Alertmanager >= 0.30.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "slack_app_token_file", amVersion, semver.MustParse("0.30.0"))
 		gc.SlackAppTokenFile = ""
 	}
 
 	if gc.SlackAppURL != nil && amVersion.LT(semver.MustParse("0.30.0")) {
-		msg := "'slack_app_url' supported in Alertmanager >= 0.30.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "slack_app_url", amVersion, semver.MustParse("0.30.0"))
 		gc.SlackAppURL = nil
 	}
 
@@ -2308,14 +2303,12 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.OpsGenieAPIKeyFile != "" && amVersion.LT(semver.MustParse("0.24.0")) {
-		msg := "'opsgenie_api_key_file' supported in Alertmanager >= 0.24.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "opsgenie_api_key_file", amVersion, semver.MustParse("0.24.0"))
 		gc.OpsGenieAPIKeyFile = ""
 	}
 
 	if gc.SMTPAuthPasswordFile != "" && amVersion.LT(semver.MustParse("0.25.0")) {
-		msg := "'smtp_auth_password_file' supported in Alertmanager >= 0.25.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "smtp_auth_password_file", amVersion, semver.MustParse("0.25.0"))
 		gc.SMTPAuthPasswordFile = ""
 	}
 
@@ -2326,8 +2319,7 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.VictorOpsAPIKeyFile != "" && amVersion.LT(semver.MustParse("0.25.0")) {
-		msg := "'victorops_api_key_file' supported in Alertmanager >= 0.25.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "victorops_api_key_file", amVersion, semver.MustParse("0.25.0"))
 		gc.VictorOpsAPIKeyFile = ""
 	}
 
@@ -2338,8 +2330,7 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.WeChatAPISecretFile != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := "'wechat_api_secret_file' supported in Alertmanager >= 0.31.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "wechat_api_secret_file", amVersion, semver.MustParse("0.31.0"))
 		gc.WeChatAPISecretFile = ""
 	}
 
@@ -2350,14 +2341,12 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.TelegramBotToken != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := "'telegram_bot_token' supported in Alertmanager >= 0.31.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "telegram_bot_token", amVersion, semver.MustParse("0.31.0"))
 		gc.TelegramBotToken = ""
 	}
 
 	if gc.TelegramBotTokenFile != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := "'telegram_bot_token_file' supported in Alertmanager >= 0.31.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "telegram_bot_token_file", amVersion, semver.MustParse("0.31.0"))
 		gc.TelegramBotTokenFile = ""
 	}
 
@@ -2368,8 +2357,7 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.SMTPAuthSecretFile != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := "'smtp_auth_secret_file' supported in Alertmanager >= 0.31.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "smtp_auth_secret_file", amVersion, semver.MustParse("0.31.0"))
 		gc.SMTPAuthSecretFile = ""
 	}
 
@@ -2380,20 +2368,17 @@ func (gc *globalConfig) sanitize(amVersion semver.Version, logger *slog.Logger) 
 	}
 
 	if gc.SMTPForceImplicitTLS != nil && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := "'smtp_force_implicit_tls' supported in Alertmanager >= 0.31.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "smtp_force_implicit_tls", amVersion, semver.MustParse("0.31.0"))
 		gc.SMTPForceImplicitTLS = nil
 	}
 
 	if gc.MattermostWebhookURL != nil && amVersion.LT(semver.MustParse("0.32.0")) {
-		msg := "'mattermost_webhook_url' supported in Alertmanager >= 0.32.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "mattermost_webhook_url", amVersion, semver.MustParse("0.32.0"))
 		gc.MattermostWebhookURL = nil
 	}
 
 	if gc.MattermostWebhookURLFile != "" && amVersion.LT(semver.MustParse("0.32.0")) {
-		msg := "'mattermost_webhook_url_file' supported in Alertmanager >= 0.32.0 only - dropping field from provided config"
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "mattermost_webhook_url_file", amVersion, semver.MustParse("0.32.0"))
 		gc.MattermostWebhookURLFile = ""
 	}
 
@@ -2688,8 +2673,7 @@ func (r *receiver) sanitize(amVersion semver.Version, logger *slog.Logger) error
 
 func (ec *emailConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	if ec.AuthPasswordFile != "" && amVersion.LT(semver.MustParse("0.25.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "auth_password_file", "0.25.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "auth_password_file", amVersion, semver.MustParse("0.25.0"))
 		ec.AuthPasswordFile = ""
 	}
 
@@ -2699,14 +2683,12 @@ func (ec *emailConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 	}
 
 	if ec.ForceImplicitTLS != nil && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "force_implicit_tls", "0.31.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "force_implicit_tls", amVersion, semver.MustParse("0.31.0"))
 		ec.ForceImplicitTLS = nil
 	}
 
 	if ec.AuthSecretFile != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "auth_secret_file", "0.31.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "auth_secret_file", amVersion, semver.MustParse("0.31.0"))
 		ec.AuthSecretFile = ""
 	}
 
@@ -2716,8 +2698,7 @@ func (ec *emailConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 	}
 
 	if ec.Threading != nil && amVersion.LT(semver.MustParse("0.30.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "threading", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "threading", amVersion, semver.MustParse("0.30.0"))
 		ec.Threading = nil
 	}
 
@@ -2738,19 +2719,16 @@ func (ogc *opsgenieConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 	lessThanV0_24 := amVersion.LT(semver.MustParse("0.24.0"))
 
 	if ogc.Actions != "" && lessThanV0_24 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "actions", "0.24.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "actions", amVersion, semver.MustParse("0.24.0"))
 		ogc.Actions = ""
 	}
 
 	if ogc.Entity != "" && lessThanV0_24 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "entity", "0.24.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "entity", amVersion, semver.MustParse("0.24.0"))
 		ogc.Entity = ""
 	}
 	if ogc.UpdateAlerts != nil && lessThanV0_24 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "update_alerts", "0.24.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "update_alerts", amVersion, semver.MustParse("0.24.0"))
 		ogc.UpdateAlerts = nil
 	}
 	for _, responder := range ogc.Responders {
@@ -2775,8 +2753,7 @@ func (ogc *opsgenieConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 	}
 
 	if lessThanV0_24 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "api_key_file", "0.24.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "api_key_file", amVersion, semver.MustParse("0.24.0"))
 		ogc.APIKeyFile = ""
 	}
 
@@ -2795,20 +2772,17 @@ func (pdc *pagerdutyConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	lessThanV0_30 := amVersion.LT(semver.MustParse("0.30.0"))
 
 	if pdc.Source != "" && lessThanV0_25 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "source", "0.25.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "source", amVersion, semver.MustParse("0.25.0"))
 		pdc.Source = ""
 	}
 
 	if pdc.RoutingKeyFile != "" && lessThanV0_25 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "routing_key_file", "0.25.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "routing_key_file", amVersion, semver.MustParse("0.25.0"))
 		pdc.RoutingKeyFile = ""
 	}
 
 	if pdc.ServiceKeyFile != "" && lessThanV0_25 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "service_key_file", "0.25.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "service_key_file", amVersion, semver.MustParse("0.25.0"))
 		pdc.ServiceKeyFile = ""
 	}
 
@@ -2825,8 +2799,7 @@ func (pdc *pagerdutyConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	}
 
 	if pdc.Timeout != nil && lessThanV0_30 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "timeout", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "timeout", amVersion, semver.MustParse("0.30.0"))
 		pdc.Timeout = nil
 	}
 
@@ -2880,8 +2853,7 @@ func (poc *pushoverConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 	lessThanV0_29 := amVersion.LT(semver.MustParse("0.29.0"))
 
 	if poc.UserKeyFile != "" && lessThanV0_26 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "user_key_file", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "user_key_file", amVersion, semver.MustParse("0.26.0"))
 		poc.UserKeyFile = ""
 	}
 
@@ -2896,8 +2868,7 @@ func (poc *pushoverConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 	}
 
 	if poc.TokenFile != "" && lessThanV0_26 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "token_file", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "token_file", amVersion, semver.MustParse("0.26.0"))
 		poc.TokenFile = ""
 	}
 
@@ -2912,20 +2883,17 @@ func (poc *pushoverConfig) sanitize(amVersion semver.Version, logger *slog.Logge
 	}
 
 	if poc.TTL != "" && lessThanV0_27 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "ttl", "0.27.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "ttl", amVersion, semver.MustParse("0.27.0"))
 		poc.TTL = ""
 	}
 
 	if poc.Device != "" && lessThanV0_26 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "device", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "device", amVersion, semver.MustParse("0.26.0"))
 		poc.Device = ""
 	}
 
 	if poc.Monospace != nil && *poc.Monospace && lessThanV0_29 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "monospace", "0.29.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "monospace", amVersion, semver.MustParse("0.29.0"))
 		*poc.Monospace = false
 	}
 
@@ -2952,39 +2920,33 @@ func (sc *slackConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 	}
 
 	if sc.Timeout != nil && lessThanV0_30 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "timeout", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "timeout", amVersion, semver.MustParse("0.30.0"))
 		sc.Timeout = nil
 	}
 
 	if sc.AppToken != "" && lessThanV0_30 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "app_token", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "app_token", amVersion, semver.MustParse("0.30.0"))
 		sc.AppToken = ""
 	}
 
 	if sc.AppTokenFile != "" && lessThanV0_30 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "app_token_file", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "app_token_file", amVersion, semver.MustParse("0.30.0"))
 		sc.AppTokenFile = ""
 	}
 
 	if sc.AppURL != "" && lessThanV0_30 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "app_url", "0.30.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "app_url", amVersion, semver.MustParse("0.30.0"))
 		sc.AppURL = ""
 	}
 
 	if sc.MessageText != "" && lessThanV0_31 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "message_text", "0.31.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "message_text", amVersion, semver.MustParse("0.31.0"))
 		sc.MessageText = ""
 	}
 
 	if sc.UpdateMessage != nil {
 		if lessThanV0_32 {
-			msg := fmt.Sprintf(unsupportedFieldMsg, "update_message", "0.32.0")
-			logger.Warn(msg)
+			warnUnsupportedField(logger, "update_message", amVersion, semver.MustParse("0.32.0"))
 			sc.UpdateMessage = nil
 		} else if *sc.UpdateMessage && sc.APIURL != "" {
 			if sc.APIURL != "https://slack.com/api/chat.postMessage" {
@@ -3010,8 +2972,7 @@ func (sc *slackConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 	// We need to sanitize the config for slack receivers
 	// As of v0.22.0 Alertmanager config supports passing URL via file name
 	if sc.APIURLFile != "" && amVersion.LT(semver.MustParse("0.22.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "api_url_file", "0.22.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "api_url_file", amVersion, semver.MustParse("0.22.0"))
 		sc.APIURLFile = ""
 	}
 
@@ -3030,8 +2991,7 @@ func (voc *victorOpsConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 	}
 
 	if voc.APIKeyFile != "" && amVersion.LT(semver.MustParse("0.25.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "api_key_file", "0.25.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "api_key_file", amVersion, semver.MustParse("0.25.0"))
 		voc.APIKeyFile = ""
 	}
 
@@ -3056,8 +3016,7 @@ func (whc *webhookConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	}
 
 	if whc.URLFile != "" && amVersion.LT(semver.MustParse("0.26.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "url_file", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "url_file", amVersion, semver.MustParse("0.26.0"))
 		whc.URLFile = ""
 	}
 
@@ -3068,14 +3027,12 @@ func (whc *webhookConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	}
 
 	if whc.Timeout != nil && amVersion.LT(semver.MustParse("0.28.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "timeout", "0.28.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "timeout", amVersion, semver.MustParse("0.28.0"))
 		whc.Timeout = nil
 	}
 
 	if whc.Payload != nil && amVersion.LT(semver.MustParse("0.32.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "payload", "0.32.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "payload", amVersion, semver.MustParse("0.32.0"))
 		whc.Payload = nil
 	}
 
@@ -3102,8 +3059,7 @@ func (tc *msTeamsConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 	}
 
 	if tc.Summary != "" && amVersion.LT(semver.MustParse("0.27.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "summary", "0.27.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "summary", amVersion, semver.MustParse("0.27.0"))
 		tc.Summary = ""
 	}
 
@@ -3141,8 +3097,7 @@ func (wcc *weChatConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 	}
 
 	if wcc.APISecretFile != "" && amVersion.LT(semver.MustParse("0.31.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "api_secret_file", "0.31.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "api_secret_file", amVersion, semver.MustParse("0.31.0"))
 		wcc.APISecretFile = ""
 	}
 
@@ -3167,15 +3122,13 @@ func (sc *snsConfig) sanitize(amVersion semver.Version, logger *slog.Logger) err
 			return fmt.Errorf("'external_id' in sigv4 config requires 'role_arn' to be set")
 		}
 		if amVersion.LT(semver.MustParse("0.34.0")) {
-			msg := fmt.Sprintf(unsupportedFieldMsg, "external_id", "0.34.0")
-			logger.Warn(msg, "current_version", amVersion.String())
+			warnUnsupportedField(logger, "external_id", amVersion, semver.MustParse("0.34.0"))
 			sc.Sigv4.ExternalID = ""
 		}
 	}
 
 	if sc.UseAWSHTTPClient && amVersion.LT(semver.MustParse("0.33.0")) {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "use_aws_http_client", "0.33.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "use_aws_http_client", amVersion, semver.MustParse("0.33.0"))
 		sc.UseAWSHTTPClient = false
 	}
 
@@ -3192,8 +3145,7 @@ func (tc *telegramConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	}
 
 	if tc.ChatIDFile != "" && lessThanV0_31 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "chat_id_file", "0.31.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "chat_id_file", amVersion, semver.MustParse("0.31.0"))
 		tc.ChatIDFile = ""
 	}
 
@@ -3208,8 +3160,7 @@ func (tc *telegramConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	}
 
 	if tc.BotTokenFile != "" && lessThanV0_26 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "bot_token_file", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "bot_token_file", amVersion, semver.MustParse("0.26.0"))
 		tc.BotTokenFile = ""
 	}
 
@@ -3224,8 +3175,7 @@ func (tc *telegramConfig) sanitize(amVersion semver.Version, logger *slog.Logger
 	}
 
 	if tc.MessageThreadID != 0 && lessThanV0_26 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "message_thread_id", "0.26.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "message_thread_id", amVersion, semver.MustParse("0.26.0"))
 		tc.MessageThreadID = 0
 	}
 
@@ -3247,8 +3197,7 @@ func (dc *discordConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 	}
 
 	if dc.WebhookURLFile != "" && lessThanV0_28 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "webhook_url_file", "0.28.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "webhook_url_file", amVersion, semver.MustParse("0.28.0"))
 		dc.WebhookURLFile = ""
 	}
 
@@ -3261,20 +3210,17 @@ func (dc *discordConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 	}
 
 	if dc.Content != "" && lessThanV0_28 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "content", "0.28.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "content", amVersion, semver.MustParse("0.28.0"))
 		dc.Content = ""
 	}
 
 	if dc.Username != "" && lessThanV0_28 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "username", "0.28.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "username", amVersion, semver.MustParse("0.28.0"))
 		dc.Username = ""
 	}
 
 	if dc.AvatarURL != "" && lessThanV0_28 {
-		msg := fmt.Sprintf(unsupportedFieldMsg, "avatar_url", "0.28.0")
-		logger.Warn(msg, "current_version", amVersion.String())
+		warnUnsupportedField(logger, "avatar_url", amVersion, semver.MustParse("0.28.0"))
 		dc.AvatarURL = ""
 	}
 
@@ -3316,8 +3262,7 @@ func (jc *jiraConfig) sanitize(amVersion semver.Version, logger *slog.Logger) er
 	apiTypeAllowed := amVersion.GTE(semver.MustParse("0.29.0"))
 	if jc.APIType != "" {
 		if !apiTypeAllowed {
-			msg := fmt.Sprintf(unsupportedFieldMsg, "api_type", "0.29.0")
-			logger.Warn(msg, "current_version", amVersion.String())
+			warnUnsupportedField(logger, "api_type", amVersion, semver.MustParse("0.29.0"))
 			jc.APIType = ""
 		} else {
 			if jc.APIType != "auto" && jc.APIType != "cloud" && jc.APIType != "datacenter" {
@@ -3428,15 +3373,13 @@ func (mc *mattermostConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 		}
 		for fieldName, valuePtr := range fieldNameMapping {
 			if *valuePtr != "" {
-				msg := fmt.Sprintf(unsupportedFieldMsg, fieldName, "0.32.0")
-				logger.Warn(msg, "current_version", amVersion.String())
+				warnUnsupportedField(logger, fieldName, amVersion, semver.MustParse("0.32.0"))
 				*valuePtr = ""
 			}
 		}
 
 		if len(mc.Fields) > 0 {
-			msg := fmt.Sprintf(unsupportedFieldMsg, "fields", "0.32.0")
-			logger.Warn(msg, "current_version", amVersion.String())
+			warnUnsupportedField(logger, "fields", amVersion, semver.MustParse("0.32.0"))
 			mc.Fields = nil
 		}
 	}
@@ -3946,4 +3889,13 @@ func (cb *ConfigBuilder) checkGlobalMattermostConfig(
 	}
 
 	return nil
+}
+
+func warnUnsupportedField(
+	logger *slog.Logger,
+	fieldName string,
+	amVersion, supportedVersion semver.Version,
+) {
+	msg := fmt.Sprintf(unsupportedFieldMsg, fieldName, supportedVersion.String())
+	logger.Warn(msg, "current_version", amVersion.String())
 }

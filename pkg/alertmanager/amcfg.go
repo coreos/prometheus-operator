@@ -3069,7 +3069,7 @@ func (tc *msTeamsConfig) sanitize(amVersion semver.Version, logger *slog.Logger)
 func (tc *msTeamsV2Config) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	msTeamsV2Allowed := amVersion.GTE(semver.MustParse("0.28.0"))
 	if !msTeamsV2Allowed {
-		return unsupportedIntegrationErr("msteams v2", "0.28.0")
+		return unsupportedIntegrationErr("msteamsv2", "0.28.0")
 	}
 
 	if tc.WebhookURL == "" && len(tc.WebhookURLFile) == 0 {
@@ -3451,7 +3451,7 @@ func (mc *mattermostConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 func (ic *incidentioConfig) sanitize(amVersion semver.Version, logger *slog.Logger) error {
 	incidentioAllowed := amVersion.GTE(semver.MustParse("0.29.0"))
 	if !incidentioAllowed {
-		return unsupportedIntegrationErr("incident.io", "0.29.0")
+		return unsupportedIntegrationErr("incidentio", "0.29.0")
 	}
 
 	if ic.URL == "" && ic.URLFile == "" {

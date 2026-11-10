@@ -2756,12 +2756,12 @@ func (cg *ConfigGenerator) generateAdditionalScrapeConfigs(
 			}
 			values, ok := mapItem.Value.([]any)
 			if !ok {
-				return nil, fmt.Errorf("error parsing relabel configs: %w", err)
+				return nil, fmt.Errorf("error parsing relabel configs: expected a list, got %T", mapItem.Value)
 			}
 			for _, value := range values {
 				relabeling, ok := value.(yaml.MapSlice)
 				if !ok {
-					return nil, fmt.Errorf("error parsing relabel config: %w", err)
+					return nil, fmt.Errorf("error parsing relabel config: expected a map, got %T", value)
 				}
 				relabelings = append(relabelings, relabeling)
 			}

@@ -3376,8 +3376,8 @@ func testAlertmanagerAutoGomemlimit(t *testing.T) {
 	// The --auto-gomemlimit* flags require Alertmanager >= v0.35.0.
 	am.Spec.Version = "v0.35.0"
 	am.Spec.AutoGomemlimit = &monitoringv1.AutoGomemlimitSpec{
-		Enabled:         ptr.To(true),
-		Ratio:           ptr.To(resource.MustParse("0.7")),
+		Enabled:         new(true),
+		Ratio:           new(resource.MustParse("0.7")),
 		RefreshInterval: ptr.To(monitoringv1.Duration("5m")),
 	}
 

@@ -3,8 +3,8 @@
   "kind": "CustomResourceDefinition",
   "metadata": {
     "annotations": {
-      "controller-gen.kubebuilder.io/version": "v0.22.0",
-      "operator.prometheus.io/version": "0.95.0"
+      "controller-gen.kubebuilder.io/version": "v0.23.0",
+      "operator.prometheus.io/version": "0.95.2"
     },
     "name": "prometheuses.monitoring.coreos.com"
   },
@@ -8735,6 +8735,7 @@
                                         },
                                         "reason": {
                                           "description": "reason is a brief CamelCase machine-parseable reason.\nTogether with status it forms the unique identity of a condition entry.\nMaximum permitted length of a reason is 256 bytes.",
+                                          "minLength": 1,
                                           "type": "string"
                                         },
                                         "status": {
@@ -8744,6 +8745,7 @@
                                             "Degraded",
                                             "Inaccessible"
                                           ],
+                                          "minLength": 1,
                                           "type": "string"
                                         }
                                       },
@@ -8753,6 +8755,7 @@
                                       ],
                                       "type": "object"
                                     },
+                                    "maxItems": 16,
                                     "type": "array",
                                     "x-kubernetes-list-map-keys": [
                                       "status",

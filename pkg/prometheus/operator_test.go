@@ -388,6 +388,50 @@ func TestValidateRemoteWriteConfig(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "with_valid_writeRelabelConfigs",
+			spec: monitoringv1.RemoteWriteSpec{
+				URL: monitoringv1.URL("http://example.com"),
+				WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+					{
+						SourceLabels: []monitoringv1.LabelName{"__name__"},
+						Regex:        "a(b|c)",
+						TargetLabel:  "job",
+						Action:       "replace",
+					},
+				},
+			},
+		},
+		{
+			name: "with_invalid_writeRelabelConfigs_regex",
+			spec: monitoringv1.RemoteWriteSpec{
+				URL: monitoringv1.URL("http://example.com"),
+				WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+					{
+						SourceLabels: []monitoringv1.LabelName{"__name__"},
+						Regex:        "(ab",
+						TargetLabel:  "job",
+						Action:       "replace",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			name:    "with_writeRelabelConfigs_action_unsupported_version",
+			version: "v2.35.0",
+			spec: monitoringv1.RemoteWriteSpec{
+				URL: monitoringv1.URL("http://example.com"),
+				WriteRelabelConfigs: []monitoringv1.RelabelConfig{
+					{
+						SourceLabels: []monitoringv1.LabelName{"__name__"},
+						TargetLabel:  "job",
+						Action:       "lowercase",
+					},
+				},
+			},
+			expectErr: true,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -104,18 +104,16 @@ for r in ${OPERATORS} ${RELOADERS} ${WEBHOOKS}; do
 			IMAGES[${#IMAGES[@]}]="${r}:${TAG}-${arch}${variant}"
 		done
 
-		# Create the manifest to join all images under one virtual tag.
-		echo "Creating manifest ${MANIFEST}"
-		docker manifest create --amend "${MANIFEST}" "${IMAGES[@]}"
-
-		# Annotate to set which image is build for which CPU architecture.
-		for arch in $CPU_ARCHS; do
-			docker manifest annotate --arch "$arch" "${MANIFEST}" "${r}:${TAG}-${arch}${variant}"
-		done
-
-		# Push the manifest to the remote registry.
-		echo "Pushing manifest ${MANIFEST}"
-		docker manifest push "${MANIFEST}"
+		# Create the manifest to join all images under one virtual tag and push
+		# it to the remote registry. `docker buildx imagetools create` is used
+		# instead of `docker manifest create` because, with the containerd image
+		# store enabled (the default on recent Docker releases), `docker build`
+		# produces each per-arch image as a single-platform OCI index. The
+		# legacy `docker manifest create` refuses to embed such a manifest list
+		# as a component, whereas `imagetools create` flattens the per-arch
+		# sources into one index and preserves their platform information.
+		echo "Creating and pushing manifest ${MANIFEST}"
+		docker buildx imagetools create -t "${MANIFEST}" "${IMAGES[@]}"
 
 		# Sign the manifest for official tags.
 		if [[ -z "${MAIN_BRANCH}" ]]; then

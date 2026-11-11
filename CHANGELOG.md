@@ -1,3 +1,11 @@
+## 0.95.2 / 2026-11-10
+
+* [BUGFIX] Fix container images for all platforms/architectures other than `linux/amd64`. #8971
+
+## 0.95.1 / 2026-11-05
+
+Maintenance release because the CI workflow failed to publish the `v0.95.0` container images.
+
 ## 0.95.0 / 2026-11-04
 
 * [CHANGE] Add `alertmanagerConfigFileSystemMode` field to the `Alertmanager` CRD controlling how to process `AlertmanagerConfig` resources which have references to files from the Alertmanager container's filesystem.

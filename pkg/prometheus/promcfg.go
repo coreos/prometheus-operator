@@ -93,8 +93,6 @@ type ConfigGenerator struct {
 	prometheusRetentionPolicies bool
 	podTopologyLabelsSupported  bool
 	inlineTLSConfig             bool
-
-	bypassVersionCheck bool
 }
 
 type ConfigGeneratorOption func(*ConfigGenerator)
@@ -140,11 +138,14 @@ func WithInlineTLSConfig() ConfigGeneratorOption {
 	}
 }
 
-// WithoutVersionCheck returns a [ConfigGenerator] which doesn't perform any
-// version check.
-func WithoutVersionCheck() ConfigGeneratorOption {
+// WithPrometheusVersion sets the Prometheus version assumed by the generator.
+// It is only useful when the generator isn't bound to a
+// Prometheus/PrometheusAgent object, e.g. the ThanosRuler remote-write
+// configuration which needs to be validated against the Prometheus version
+// equivalent to the Thanos version.
+func WithPrometheusVersion(version semver.Version) ConfigGeneratorOption {
 	return func(cg *ConfigGenerator) {
-		cg.bypassVersionCheck = true
+		cg.version = version
 	}
 }
 
@@ -287,7 +288,6 @@ func (cg *ConfigGenerator) WithKeyVals(keyvals ...any) *ConfigGenerator {
 		prometheusRetentionPolicies: cg.prometheusRetentionPolicies,
 		podTopologyLabelsSupported:  cg.podTopologyLabelsSupported,
 		inlineTLSConfig:             cg.inlineTLSConfig,
-		bypassVersionCheck:          cg.bypassVersionCheck,
 	}
 }
 
@@ -296,10 +296,6 @@ func (cg *ConfigGenerator) WithKeyVals(keyvals ...any) *ConfigGenerator {
 // given version.
 // The method panics if version isn't a valid SemVer value.
 func (cg *ConfigGenerator) WithMinimumVersion(version string) *ConfigGenerator {
-	if cg.bypassVersionCheck {
-		return cg
-	}
-
 	if cg.version.LT(semver.MustParse(version)) {
 		return &ConfigGenerator{
 			logger:                      cg.logger.With("minimum_version", version),
@@ -314,7 +310,6 @@ func (cg *ConfigGenerator) WithMinimumVersion(version string) *ConfigGenerator {
 			prometheusRetentionPolicies: cg.prometheusRetentionPolicies,
 			podTopologyLabelsSupported:  cg.podTopologyLabelsSupported,
 			inlineTLSConfig:             cg.inlineTLSConfig,
-			bypassVersionCheck:          cg.bypassVersionCheck,
 		}
 	}
 
@@ -326,10 +321,6 @@ func (cg *ConfigGenerator) WithMinimumVersion(version string) *ConfigGenerator {
 // equal to the given version.
 // The method panics if version isn't a valid SemVer value.
 func (cg *ConfigGenerator) WithMaximumVersion(version string) *ConfigGenerator {
-	if cg.bypassVersionCheck {
-		return cg
-	}
-
 	if cg.version.GTE(semver.MustParse(version)) {
 		return &ConfigGenerator{
 			logger:                      cg.logger.With("maximum_version", version),
@@ -344,7 +335,6 @@ func (cg *ConfigGenerator) WithMaximumVersion(version string) *ConfigGenerator {
 			prometheusRetentionPolicies: cg.prometheusRetentionPolicies,
 			podTopologyLabelsSupported:  cg.podTopologyLabelsSupported,
 			inlineTLSConfig:             cg.inlineTLSConfig,
-			bypassVersionCheck:          cg.bypassVersionCheck,
 		}
 	}
 
@@ -2756,12 +2746,12 @@ func (cg *ConfigGenerator) generateAdditionalScrapeConfigs(
 			}
 			values, ok := mapItem.Value.([]any)
 			if !ok {
-				return nil, fmt.Errorf("error parsing relabel configs: %w", err)
+				return nil, fmt.Errorf("error parsing relabel configs: expected a list, got %T", mapItem.Value)
 			}
 			for _, value := range values {
 				relabeling, ok := value.(yaml.MapSlice)
 				if !ok {
-					return nil, fmt.Errorf("error parsing relabel config: %w", err)
+					return nil, fmt.Errorf("error parsing relabel config: expected a map, got %T", value)
 				}
 				relabelings = append(relabelings, relabeling)
 			}

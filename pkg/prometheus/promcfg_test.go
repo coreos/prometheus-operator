@@ -1721,6 +1721,51 @@ func TestAdditionalScrapeConfigs(t *testing.T) {
 	}
 }
 
+func TestAdditionalScrapeConfigsInvalidRelabelConfigs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		config string
+		errMsg string
+	}{
+		{
+			name: "relabel_configs is not a list",
+			config: `- job_name: foo
+  relabel_configs:
+    action: keep
+`,
+			errMsg: "error parsing relabel configs: expected a list, got yaml.MapSlice",
+		},
+		{
+			name: "relabel config is not a map",
+			config: `- job_name: foo
+  relabel_configs:
+  - keep
+`,
+			errMsg: "error parsing relabel config: expected a map, got string",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := defaultPrometheus()
+			p.Spec.Shards = new(int32(2))
+
+			cg := mustNewConfigGenerator(t, p)
+			_, err := cg.GenerateServerConfiguration(
+				p,
+				nil,
+				nil,
+				nil,
+				nil,
+				&assets.StoreBuilder{},
+				[]byte(tc.config),
+				nil,
+				nil,
+				nil,
+			)
+			require.EqualError(t, err, "generate additional scrape configs: "+tc.errMsg)
+		})
+	}
+}
+
 func TestAdditionalAlertRelabelConfigs(t *testing.T) {
 	p := defaultPrometheus()
 	p.Spec.Alerting = &monitoringv1.AlertingSpec{

@@ -3,8 +3,8 @@
   "kind": "CustomResourceDefinition",
   "metadata": {
     "annotations": {
-      "controller-gen.kubebuilder.io/version": "v0.22.0",
-      "operator.prometheus.io/version": "0.95.0"
+      "controller-gen.kubebuilder.io/version": "v0.23.0",
+      "operator.prometheus.io/version": "0.95.2"
     },
     "name": "alertmanagers.monitoring.coreos.com"
   },
@@ -6449,6 +6449,7 @@
                                         },
                                         "reason": {
                                           "description": "reason is a brief CamelCase machine-parseable reason.\nTogether with status it forms the unique identity of a condition entry.\nMaximum permitted length of a reason is 256 bytes.",
+                                          "minLength": 1,
                                           "type": "string"
                                         },
                                         "status": {
@@ -6458,6 +6459,7 @@
                                             "Degraded",
                                             "Inaccessible"
                                           ],
+                                          "minLength": 1,
                                           "type": "string"
                                         }
                                       },
@@ -6467,6 +6469,7 @@
                                       ],
                                       "type": "object"
                                     },
+                                    "maxItems": 16,
                                     "type": "array",
                                     "x-kubernetes-list-map-keys": [
                                       "status",
@@ -8285,6 +8288,17 @@
                   "web": {
                     "description": "web defines the web command line flags when starting Alertmanager.",
                     "properties": {
+                      "corsOrigin": {
+                        "description": "corsOrigin is a fully anchored regular expression matching the origins\nallowed to call the API from a browser. This corresponds to the\nAlertmanager's `--web.cors.origin` flag.\nIt requires Alertmanager >= v0.34.2.",
+                        "minLength": 1,
+                        "type": "string",
+                        "x-kubernetes-validations": [
+                          {
+                            "message": "corsOrigin must be a valid regular expression",
+                            "rule": "''.matches('^(?:'+self+')$') || !''.matches('^(?:'+self+')$')"
+                          }
+                        ]
+                      },
                       "getConcurrency": {
                         "description": "getConcurrency defines the maximum number of GET requests processed concurrently. This corresponds to the\nAlertmanager's `--web.get-concurrency` flag.",
                         "format": "int32",

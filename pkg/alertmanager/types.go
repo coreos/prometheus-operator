@@ -16,6 +16,7 @@ package alertmanager
 
 import (
 	"github.com/prometheus/alertmanager/config"
+	"github.com/prometheus/alertmanager/config/common"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 )
@@ -45,7 +46,7 @@ type globalConfig struct {
 
 	SMTPFrom                 string          `yaml:"smtp_from,omitempty"`
 	SMTPHello                string          `yaml:"smtp_hello,omitempty"`
-	SMTPSmarthost            config.HostPort `yaml:"smtp_smarthost,omitempty"`
+	SMTPSmarthost            common.HostPort `yaml:"smtp_smarthost,omitempty"`
 	SMTPAuthUsername         string          `yaml:"smtp_auth_username,omitempty"`
 	SMTPAuthPassword         string          `yaml:"smtp_auth_password,omitempty"`
 	SMTPAuthPasswordFile     string          `yaml:"smtp_auth_password_file,omitempty"`
@@ -333,7 +334,7 @@ type emailConfig struct {
 	To               string                `yaml:"to,omitempty"`
 	From             string                `yaml:"from,omitempty"`
 	Hello            string                `yaml:"hello,omitempty"`
-	Smarthost        config.HostPort       `yaml:"smarthost,omitempty"`
+	Smarthost        common.HostPort       `yaml:"smarthost,omitempty"`
 	AuthUsername     string                `yaml:"auth_username,omitempty"`
 	AuthPassword     string                `yaml:"auth_password,omitempty"`
 	AuthPasswordFile string                `yaml:"auth_password_file,omitempty"`

@@ -723,6 +723,7 @@ type AlertmanagerLimitsSpec struct {
 
 // AutoGomemlimitSpec defines the automatic GOMEMLIMIT command line flags when starting Alertmanager.
 // +k8s:openapi-gen=true
+// +kubebuilder:validation:XValidation:rule="!has(self.ratio) || (quantity(string(self.ratio)).compareTo(quantity('0')) > 0 && quantity(string(self.ratio)).compareTo(quantity('1')) <= 0)",message="ratio must be greater than 0 and less than or equal to 1"
 type AutoGomemlimitSpec struct {
 	// enabled enables automatically setting GOMEMLIMIT to match the
 	// Linux container or system memory limit. This corresponds to the
@@ -736,7 +737,6 @@ type AutoGomemlimitSpec struct {
 	// `--auto-gomemlimit.ratio` flag.
 	// It defaults to 0.9 in Alertmanager.
 	//
-	// +kubebuilder:validation:XValidation:rule="!has(self) || (quantity(self).Cmp(quantity('0')) > 0 && quantity(self).Cmp(quantity('1')) <= 0)",message="ratio must be greater than 0 and less than or equal to 1"
 	// +optional
 	Ratio *resource.Quantity `json:"ratio,omitempty"`
 	// refreshInterval defines the interval at which to re-detect the container

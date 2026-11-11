@@ -2576,11 +2576,6 @@ spec:
                       It defaults to 0.9 in Alertmanager.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
-                    x-kubernetes-validations:
-                    - message: ratio must be greater than 0 and less than or equal
-                        to 1
-                      rule: '!has(self) || (quantity(self).Cmp(quantity(''0'')) >
-                        0 && quantity(self).Cmp(quantity(''1'')) <= 0)'
                   refreshInterval:
                     description: |-
                       refreshInterval defines the interval at which to re-detect the container
@@ -2591,6 +2586,12 @@ spec:
                     pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: ratio must be greater than 0 and less than or equal to
+                    1
+                  rule: '!has(self.ratio) || (quantity(string(self.ratio)).compareTo(quantity(''0''))
+                    > 0 && quantity(string(self.ratio)).compareTo(quantity(''1''))
+                    <= 0)'
               automountServiceAccountToken:
                 description: |-
                   automountServiceAccountToken defines whether a service account token should be automatically mounted in the pod.

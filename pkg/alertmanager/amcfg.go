@@ -2975,6 +2975,12 @@ func (sc *slackConfig) sanitize(amVersion semver.Version, logger *slog.Logger) e
 		return fmt.Errorf("at most one of app_token/app_token_file & api_url/api_url_file must be configured")
 	}
 
+	if sc.PostUpdatesToThread != nil && amVersion.LT(semver.MustParse("0.35.0")) {
+		msg := "'post_updates_to_thread' supported in Alertmanager >= 0.35.0 only - dropping field from provided config"
+		logger.Warn(msg, "current_version", amVersion.String())
+		sc.PostUpdatesToThread = nil
+	}
+
 	if sc.APIURLFile == "" {
 		return nil
 	}

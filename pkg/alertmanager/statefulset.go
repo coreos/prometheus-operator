@@ -345,6 +345,19 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 		}
 	}
 
+	autoGomemlimit := a.Spec.AutoGomemlimit
+	if version.GTE(semver.MustParse("0.35.0")) && autoGomemlimit != nil && ptr.Deref(autoGomemlimit.Enabled, false) {
+		amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit", Value: "true"})
+
+		if autoGomemlimit.Ratio != nil {
+			amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit.ratio", Value: autoGomemlimit.Ratio.AsDec().String()})
+		}
+
+		if autoGomemlimit.RefreshInterval != nil {
+			amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit.refresh-interval", Value: string(*autoGomemlimit.RefreshInterval)})
+		}
+	}
+
 	if version.GTE(semver.MustParse("0.30.0")) && a.Spec.MinReadySeconds != nil {
 		startDelayArg := monitoringv1.Argument{
 			Name:  "dispatch.start-delay",

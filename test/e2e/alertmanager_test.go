@@ -3362,6 +3362,39 @@ func testAMScaleUpWithoutLabels(t *testing.T) {
 	require.NotEmpty(t, sts.GetLabels(), "expected labels to be restored on the StatefulSet by the operator")
 }
 
+func testAlertmanagerAutoGomemlimit(t *testing.T) {
+	// Don't run Alertmanager tests in parallel. See
+	// https://github.com/prometheus/alertmanager/issues/1835 for details.
+	ctx := context.Background()
+	testCtx := framework.NewTestCtx(t)
+	defer testCtx.Cleanup(t)
+	ns := framework.CreateNamespace(ctx, t, testCtx)
+	framework.SetupPrometheusRBAC(ctx, t, testCtx, ns)
+
+	name := "test"
+	am := framework.MakeBasicAlertmanager(ns, name, 1)
+	// The --auto-gomemlimit* flags require Alertmanager >= v0.35.0.
+	am.Spec.Version = "v0.35.0"
+	am.Spec.AutoGomemlimit = &monitoringv1.AutoGomemlimitSpec{
+		Enabled:         ptr.To(true),
+		Ratio:           ptr.To(resource.MustParse("0.7")),
+		RefreshInterval: ptr.To(monitoringv1.Duration("5m")),
+	}
+
+	_, err := framework.CreateAlertmanagerAndWaitUntilReady(ctx, am)
+	require.NoError(t, err)
+
+	sts, err := framework.KubeClient.AppsV1().StatefulSets(ns).Get(ctx, fmt.Sprintf("alertmanager-%s", name), metav1.GetOptions{})
+	require.NoError(t, err)
+
+	args := sts.Spec.Template.Spec.Containers[0].Args
+	require.Contains(t, args, "--auto-gomemlimit=true")
+	require.Contains(t, args, "--auto-gomemlimit.ratio=0.7")
+	require.Contains(t, args, "--auto-gomemlimit.refresh-interval=5m")
+
+	require.NoError(t, framework.DeleteAlertmanagerAndWaitUntilGone(ctx, ns, name))
+}
+
 func testAlertmanagerZeroDuration(t *testing.T) {
 	tests := []struct {
 		name  string

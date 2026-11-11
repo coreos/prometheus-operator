@@ -2,7 +2,7 @@ ARG ARCH=amd64
 ARG OS=linux
 ARG GOLANG_BUILDER=1.26
 
-FROM quay.io/prometheus/golang-builder:${GOLANG_BUILDER}-base AS builder
+FROM --platform=$BUILDPLATFORM quay.io/prometheus/golang-builder:${GOLANG_BUILDER}-base AS builder
 WORKDIR /workspace
 
 COPY . .

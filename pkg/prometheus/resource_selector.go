@@ -1347,7 +1347,7 @@ func (rs *ResourceSelector) validateStaticConfig(sc *monitoringv1alpha1.ScrapeCo
 
 func (rs *ResourceSelector) validateIonosSDConfigs(ctx context.Context, sc *monitoringv1alpha1.ScrapeConfig) error {
 	//if len(sc.Spec.IonosSDConfigs) > 0 && rs.version.LT(semver.MustParse("2.36.0")) {
-	if rs.version.LT(semver.MustParse("2.36.0")) {
+	if len(sc.Spec.IonosSDConfigs) > 0 && rs.version.LT(semver.MustParse("2.36.0")) {
 		return fmt.Errorf("IONOS SD configuration is only supported for Prometheus version >= 2.36.0")
 	}
 

@@ -4986,6 +4986,9 @@ func TestSelectScrapeConfigs(t *testing.T) {
 				return nil
 			})
 
+			if err != nil {
+				t.Logf("err: %s", err)
+			}
 			require.NoError(t, err)
 			require.Len(t, sms, 1)
 

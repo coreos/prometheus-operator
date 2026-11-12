@@ -486,7 +486,9 @@ func (rcg *fakeReconciledConditionGetter) GetCondition(_ string, n int64) monito
 
 type fakeDeletionChecker struct{}
 
-func (dc *fakeDeletionChecker) DeletionInProgress(_ metav1.Object) bool { return false }
+func (dc *fakeDeletionChecker) DeletionInProgress(o metav1.Object) bool {
+	return o.GetDeletionTimestamp() != nil
+}
 
 func fakeStatefulSet(name string) appsv1.StatefulSet {
 	return appsv1.StatefulSet{
@@ -684,6 +686,50 @@ func TestStatefulSetReporterProcess(t *testing.T) {
 						Type:               monitoringv1.Available,
 						Status:             monitoringv1.ConditionFalse,
 						Reason:             "StatefulSetNotFound",
+						ObservedGeneration: 42,
+					},
+					{
+						Type:               monitoringv1.Reconciled,
+						Status:             monitoringv1.ConditionTrue,
+						ObservedGeneration: 42,
+					},
+				},
+				ShardStatuses: []monitoringv1.ShardStatus{
+					{
+						ShardID: "0",
+					},
+				},
+			},
+		},
+		{
+			// The StatefulSet left over from a deleted Prometheus with the same
+			// name is still terminating (e.g. held by a finalizer) while its pod
+			// is still ready.
+			name: "prometheus with (replicas=1,shards=1) and a terminating statefulset",
+			p: monitoringv1.Prometheus{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test",
+					Namespace:  "ns",
+					Generation: 42,
+				},
+				Spec: monitoringv1.PrometheusSpec{},
+			},
+			ssets: []appsv1.StatefulSet{
+				func() appsv1.StatefulSet {
+					sset := fakeStatefulSet("prometheus-test")
+					sset.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					return sset
+				}(),
+			},
+			pods: []corev1.Pod{
+				fakeReadyPod("prometheus-test", 0, true),
+			},
+			exp: &monitoringv1.PrometheusStatus{
+				Conditions: []monitoringv1.Condition{
+					{
+						Type:               monitoringv1.Available,
+						Status:             monitoringv1.ConditionFalse,
+						Reason:             "StatefulSetDeletionInProgress",
 						ObservedGeneration: 42,
 					},
 					{

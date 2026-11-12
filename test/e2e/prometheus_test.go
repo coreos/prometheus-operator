@@ -1548,16 +1548,15 @@ func testPromMultiplePrometheusRulesDifferentNS(t *testing.T) {
 // of required ConfigMap mounts changes beyond that capacity.
 func testRulesConfigMapLifecycle(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		minimumCount  *int32
-		initialMounts int
-		ruleCount     int
-		wantRollout   bool
+		name         string
+		minimumCount *int32
+		ruleCount    int
+		wantRollout  bool
 	}{
-		{name: "unset reservation", initialMounts: 3, ruleCount: 2},
-		{name: "no reservation", minimumCount: new(int32(0)), initialMounts: 1, ruleCount: 2, wantRollout: true},
-		{name: "exceed positive reservation", minimumCount: new(int32(1)), initialMounts: 1, ruleCount: 2, wantRollout: true},
-		{name: "custom reservation", minimumCount: new(int32(5)), initialMounts: 5, ruleCount: 4},
+		{name: "unset reservation", ruleCount: 2},
+		{name: "no reservation", minimumCount: new(int32(0)), ruleCount: 2, wantRollout: true},
+		{name: "exceed positive reservation", minimumCount: new(int32(1)), ruleCount: 2, wantRollout: true},
+		{name: "custom reservation", minimumCount: new(int32(5)), ruleCount: 4},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -1584,12 +1583,10 @@ func testRulesConfigMapLifecycle(t *testing.T) {
 			require.NoError(t, framework.WaitForPrometheusFiringAlert(context.Background(), ns, pSVC.Name, rule.Spec.Groups[0].Rules[0].Alert))
 
 			// Reserved volumes must not create extra ConfigMaps.
-			configMapPrefix := "prometheus-" + p.Name + "-rulefiles-"
-			_, err = framework.WaitForConfigMapExist(context.Background(), ns, configMapPrefix+"0")
+			listOptions := metav1.ListOptions{LabelSelector: "prometheus-name=" + p.Name}
+			configMaps, err := framework.KubeClient.CoreV1().ConfigMaps(ns).List(context.Background(), listOptions)
 			require.NoError(t, err)
-			for i := 1; i <= tc.initialMounts; i++ {
-				require.NoError(t, framework.WaitForConfigMapNotExist(context.Background(), ns, configMapPrefix+strconv.Itoa(i)))
-			}
+			require.Len(t, configMaps.Items, 1)
 
 			// Record the StatefulSet's generation before adding rules.
 			sts, err := framework.KubeClient.AppsV1().StatefulSets(ns).Get(context.Background(), "prometheus-"+p.Name, metav1.GetOptions{})
@@ -1602,16 +1599,14 @@ func testRulesConfigMapLifecycle(t *testing.T) {
 				require.NoError(t, err)
 				prometheusRules = append(prometheusRules, rule)
 			}
-			for i := range tc.ruleCount {
-				_, err := framework.WaitForConfigMapExist(context.Background(), ns, configMapPrefix+strconv.Itoa(i))
-				require.NoError(t, err)
-			}
-			require.NoError(t, framework.WaitForConfigMapNotExist(context.Background(), ns, configMapPrefix+strconv.Itoa(tc.ruleCount)))
-
 			// Every rule must be loaded, including when the reservation is zero.
 			for _, rule := range prometheusRules {
 				require.NoError(t, framework.WaitForPrometheusFiringAlert(context.Background(), ns, pSVC.Name, rule.Spec.Groups[0].Rules[0].Alert))
 			}
+			configMaps, err = framework.KubeClient.CoreV1().ConfigMaps(ns).List(context.Background(), listOptions)
+			require.NoError(t, err)
+			require.Len(t, configMaps.Items, tc.ruleCount)
+
 			sts, err = framework.KubeClient.AppsV1().StatefulSets(ns).Get(context.Background(), "prometheus-"+p.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 			if tc.wantRollout {
@@ -1624,9 +1619,6 @@ func testRulesConfigMapLifecycle(t *testing.T) {
 			// Remove the added rules and wait for their alerts and ConfigMaps to disappear.
 			for _, rule := range prometheusRules[1:] {
 				require.NoError(t, framework.DeleteRule(context.Background(), ns, rule.Name))
-			}
-			for i := 1; i < tc.ruleCount; i++ {
-				require.NoError(t, framework.WaitForConfigMapNotExist(context.Background(), ns, configMapPrefix+strconv.Itoa(i)))
 			}
 			var loopError error
 			err = wait.PollUntilContextTimeout(context.Background(), time.Second, 5*framework.DefaultTimeout, true, func(ctx context.Context) (bool, error) {
@@ -1641,9 +1633,17 @@ func testRulesConfigMapLifecycle(t *testing.T) {
 						return false, nil
 					}
 				}
+				configMaps, loopError = framework.KubeClient.CoreV1().ConfigMaps(ns).List(ctx, listOptions)
+				if loopError != nil {
+					return false, nil
+				}
+				if len(configMaps.Items) != 1 {
+					loopError = fmt.Errorf("expected 1 rule ConfigMap, got %d", len(configMaps.Items))
+					return false, nil
+				}
 				return true, nil
 			})
-			require.NoError(t, err, "waiting for Prometheus to unload deleted rules: %v", loopError)
+			require.NoError(t, err, "waiting for deleted rules and obsolete ConfigMaps to be removed: %v", loopError)
 			require.NoError(t, framework.WaitForPrometheusFiringAlert(context.Background(), ns, pSVC.Name, prometheusRules[0].Spec.Groups[0].Rules[0].Alert))
 
 			// Verify the rollout after the removed rules are absent.

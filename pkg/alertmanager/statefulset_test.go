@@ -627,6 +627,21 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 				"--auto-gomemlimit.refresh-interval=5m",
 			},
 		},
+		{
+			// The API server stores quantities in canonical form ("0.7" is
+			// returned as "700m"), the rendered flag value must stay a plain
+			// decimal number.
+			scenario: "auto-gomemlimit ratio in canonical quantity form",
+			version:  "v0.35.0",
+			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
+				Enabled: new(true),
+				Ratio:   new(resource.MustParse("700m")),
+			},
+			expectedArgs: []string{
+				"--auto-gomemlimit",
+				"--auto-gomemlimit.ratio=0.7",
+			},
+		},
 	}
 
 	for _, ts := range tt {

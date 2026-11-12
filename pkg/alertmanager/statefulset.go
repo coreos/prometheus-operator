@@ -20,6 +20,7 @@ import (
 	"maps"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -353,7 +354,12 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 		amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit", Value: ""})
 
 		if autoGomemlimit.Ratio != nil {
-			amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit.ratio", Value: autoGomemlimit.Ratio.AsDec().String()})
+			// Render the ratio as a plain decimal (e.g. "700m" -> "0.7").
+			ratio := autoGomemlimit.Ratio.AsDec().String()
+			if f, err := strconv.ParseFloat(ratio, 64); err == nil {
+				ratio = strconv.FormatFloat(f, 'f', -1, 64)
+			}
+			amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit.ratio", Value: ratio})
 		}
 
 		if autoGomemlimit.RefreshInterval != nil {

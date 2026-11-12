@@ -746,6 +746,76 @@ func TestStatefulSetReporterProcess(t *testing.T) {
 			},
 		},
 		{
+			name: "prometheus with (replicas=2,shards=3) with healthy, degraded and terminating statefulsets",
+			p: monitoringv1.Prometheus{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test",
+					Namespace:  "ns",
+					Generation: 42,
+				},
+				Spec: monitoringv1.PrometheusSpec{
+					CommonPrometheusFields: monitoringv1.CommonPrometheusFields{
+						Replicas: new(int32(2)),
+						Shards:   new(int32(3)),
+					},
+				},
+			},
+			ssets: []appsv1.StatefulSet{
+				fakeStatefulSet("prometheus-test"),
+				fakeStatefulSet("prometheus-test-shard-1"),
+				func() appsv1.StatefulSet {
+					sset := fakeStatefulSet("prometheus-test-shard-2")
+					sset.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					return sset
+				}(),
+			},
+			pods: []corev1.Pod{
+				fakeReadyPod("prometheus-test", 0, true),
+				fakeReadyPod("prometheus-test", 1, true),
+				fakeReadyPod("prometheus-test-shard-1", 0, true),
+				fakeReadyPod("prometheus-test-shard-1", 1, false),
+				fakeReadyPod("prometheus-test-shard-2", 0, true),
+				fakeReadyPod("prometheus-test-shard-2", 1, true),
+			},
+			exp: &monitoringv1.PrometheusStatus{
+				Conditions: []monitoringv1.Condition{
+					{
+						Type:               monitoringv1.Available,
+						Status:             monitoringv1.ConditionFalse,
+						Reason:             "SomePodsNotReadyAndStatefulSetDeletionInProgress",
+						ObservedGeneration: 42,
+					},
+					{
+						Type:               monitoringv1.Reconciled,
+						Status:             monitoringv1.ConditionTrue,
+						ObservedGeneration: 42,
+					},
+				},
+				ShardStatuses: []monitoringv1.ShardStatus{
+					{
+						ShardID:           "0",
+						Replicas:          2,
+						UpdatedReplicas:   2,
+						AvailableReplicas: 2,
+					},
+					{
+						ShardID:             "1",
+						Replicas:            2,
+						UpdatedReplicas:     2,
+						AvailableReplicas:   1,
+						UnavailableReplicas: 1,
+					},
+					{
+						ShardID: "2",
+					},
+				},
+				Replicas:            4,
+				UpdatedReplicas:     4,
+				AvailableReplicas:   3,
+				UnavailableReplicas: 1,
+			},
+		},
+		{
 			name: "prometheus with (replicas=1,shards=1) and no pods",
 			p: monitoringv1.Prometheus{
 				ObjectMeta: metav1.ObjectMeta{

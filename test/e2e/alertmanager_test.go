@@ -3388,7 +3388,7 @@ func testAlertmanagerAutoGomemlimit(t *testing.T) {
 	require.NoError(t, err)
 
 	args := sts.Spec.Template.Spec.Containers[0].Args
-	require.Contains(t, args, "--auto-gomemlimit=true")
+	require.Contains(t, args, "--auto-gomemlimit")
 	require.Contains(t, args, "--auto-gomemlimit.ratio=0.7")
 	require.Contains(t, args, "--auto-gomemlimit.refresh-interval=5m")
 

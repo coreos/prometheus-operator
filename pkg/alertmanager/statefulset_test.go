@@ -611,7 +611,7 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
 				Enabled: new(true),
 			},
-			expectedArgs: []string{"--auto-gomemlimit=true"},
+			expectedArgs: []string{"--auto-gomemlimit"},
 		},
 		{
 			scenario: "auto-gomemlimit with ratio and refresh interval",
@@ -622,7 +622,7 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 				RefreshInterval: new(monitoringv1.Duration("5m")),
 			},
 			expectedArgs: []string{
-				"--auto-gomemlimit=true",
+				"--auto-gomemlimit",
 				"--auto-gomemlimit.ratio=0.7",
 				"--auto-gomemlimit.refresh-interval=5m",
 			},

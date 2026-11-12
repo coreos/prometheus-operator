@@ -347,7 +347,10 @@ func makeStatefulSetSpec(logger *slog.Logger, a *monitoringv1.Alertmanager, conf
 
 	autoGomemlimit := a.Spec.AutoGomemlimit
 	if version.GTE(semver.MustParse("0.35.0")) && autoGomemlimit != nil && ptr.Deref(autoGomemlimit.Enabled, false) {
-		amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit", Value: "true"})
+		// The boolean flag doesn't accept a value (kingpin rejects
+		// `--auto-gomemlimit=true`), hence the empty value which renders as
+		// `--auto-gomemlimit`.
+		amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit", Value: ""})
 
 		if autoGomemlimit.Ratio != nil {
 			amArgs = append(amArgs, monitoringv1.Argument{Name: "auto-gomemlimit.ratio", Value: autoGomemlimit.Ratio.AsDec().String()})

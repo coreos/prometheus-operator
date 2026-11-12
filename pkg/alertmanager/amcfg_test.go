@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
-	"github.com/prometheus/alertmanager/config"
+	"github.com/prometheus/alertmanager/config/common"
 	"github.com/prometheus/alertmanager/timeinterval"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
@@ -5246,7 +5246,7 @@ func TestGenerateConfigEmailReceiver(t *testing.T) {
 			kclient:   fake.NewClientset(),
 			baseConfig: alertmanagerConfig{
 				Global: &globalConfig{
-					SMTPSmarthost: config.HostPort{
+					SMTPSmarthost: common.HostPort{
 						Host: "smtp.example.org",
 						Port: "587",
 					},

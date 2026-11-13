@@ -1561,7 +1561,11 @@ func testAlertmanagerConfigCRD(t *testing.T) {
 	err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
 		cfgSecret, err := framework.KubeClient.CoreV1().Secrets(ns).Get(ctx, amConfigSecretName, metav1.GetOptions{})
 		if err != nil {
-			lastErr = fmt.Errorf("failed to get generated configuration secret: %w", err)
+			// Keep the previous error (e.g. the config diff) when the
+			// poll's own deadline cancels the request.
+			if ctx.Err() == nil {
+				lastErr = fmt.Errorf("failed to get generated configuration secret: %w", err)
+			}
 			return false, nil
 		}
 
@@ -1683,6 +1687,12 @@ receivers:
   msteamsv2_configs:
   - webhook_url: https://msteamsv2.webhook.url
     title: Alert
+  rocketchat_configs:
+  - api_url: https://rocketchat.api.url
+    token_id: abcdef12345
+    token: abcdef
+    short_fields: false
+    link_names: false
 - name: %s/e2e-test-amconfig-sub-routes/e2e
   webhook_configs:
   - url: http://test.url

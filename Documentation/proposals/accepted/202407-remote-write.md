@@ -85,7 +85,7 @@ type RemoteWrite struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec monitoringv1.RemoteWriteSpec `json:"spec"`
+	Spec   monitoringv1.RemoteWriteSpec      `json:"spec"`
 	Status monitoringv1.ConfigResourceStatus `json:"status,omitempty"`
 }
 ```
@@ -214,7 +214,7 @@ An application developer/operator will somehow share the remote_write configurat
 
 ## Action Plan
 
-* [x] Add the `RemoteWriteCustomResourceDefinition` feature gate.
+* [X] Add the `RemoteWriteCustomResourceDefinition` feature gate.
 
   <gh pr="8395">
 

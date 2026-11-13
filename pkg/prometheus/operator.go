@@ -311,6 +311,16 @@ func (sr *StatusReporter) Process(ctx context.Context, logger *slog.Logger, p mo
 
 		sset := obj.(*appsv1.StatefulSet).DeepCopy()
 		if sr.dc.DeletionInProgress(sset) {
+			// The statefulset is going away (it may still belong to a previous
+			// object with the same name), so it can't make this shard available.
+			statuses, reasons = append(statuses, monitoringv1.ConditionFalse), append(reasons, "StatefulSetDeletionInProgress")
+			messages = append(messages, fmt.Sprintf("shard %d: statefulset %s is being deleted", shard, ssetName))
+			pStatus.ShardStatuses = append(
+				pStatus.ShardStatuses,
+				monitoringv1.ShardStatus{
+					ShardID: strconv.Itoa(shard),
+				})
+
 			continue
 		}
 

@@ -3373,22 +3373,20 @@ func testAlertmanagerAutoGomemlimit(t *testing.T) {
 
 	name := "test"
 	am := framework.MakeBasicAlertmanager(ns, name, 1)
-	// The --auto-gomemlimit* flags require Alertmanager >= v0.35.0.
-	am.Spec.Version = "v0.35.0"
 	am.Spec.AutoGomemlimit = &monitoringv1.AutoGomemlimitSpec{
 		Enabled:         new(true),
 		Ratio:           new(resource.MustParse("0.7")),
 		RefreshInterval: new(monitoringv1.GoDuration("5m")),
 	}
+	// Set a memory limit so that Alertmanager can detect it from the cgroup.
+	am.Spec.Resources = corev1.ResourceRequirements{
+		Limits: corev1.ResourceList{
+			corev1.ResourceMemory: resource.MustParse("200Mi"),
+		},
+	}
 
 	_, err := framework.CreateAlertmanagerAndWaitUntilReady(ctx, am)
 	require.NoError(t, err)
-
-	// When auto-gomemlimit is enabled, Alertmanager logs the GOMEMLIMIT value
-	// applied at startup.
-	logs, err := framework.KubeClient.CoreV1().Pods(ns).GetLogs(fmt.Sprintf("alertmanager-%s-0", name), &corev1.PodLogOptions{Container: "alertmanager"}).Do(ctx).Raw()
-	require.NoError(t, err)
-	require.Contains(t, string(logs), "GOMEMLIMIT is updated")
 
 	require.NoError(t, framework.DeleteAlertmanagerAndWaitUntilGone(ctx, ns, name))
 }

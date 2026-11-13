@@ -66,6 +66,8 @@ const (
 	applicationNameLabelValue = "alertmanager"
 
 	selectingAlertmanagerConfigResourcesAction = "SelectingAlertmanagerConfigResources"
+
+	retrieveSecretErrMsg = "failed to retrieve secret '%s': %w"
 )
 
 // Config defines the operator's parameters for the Alertmanager controller.
@@ -2190,5 +2192,5 @@ func ApplyConfigurationFromAlertmanager(a *monitoringv1.Alertmanager, updateScal
 }
 
 func retrieveSecretErr(secretName string, err error) error {
-	return fmt.Errorf("failed to retrieve secret '%s': %w", secretName, err)
+	return fmt.Errorf(retrieveSecretErrMsg, secretName, err)
 }

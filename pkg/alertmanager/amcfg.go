@@ -480,7 +480,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.SlackAPIURL != nil {
 		slackAPIURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.SlackAPIURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get Slack API URL: %w", err)
+			return nil, retrieveSecretErr("slackApiUrl", err)
 		}
 		u, err := url.Parse(slackAPIURL)
 		if err != nil {
@@ -492,7 +492,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.OpsGenieAPIURL != nil {
 		opsgenieAPIURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.OpsGenieAPIURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OpsGenie API URL: %w", err)
+			return nil, retrieveSecretErr("opsGenieApiUrl", err)
 		}
 		u, err := url.Parse(opsgenieAPIURL)
 		if err != nil {
@@ -504,7 +504,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.OpsGenieAPIKey != nil {
 		opsGenieAPIKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.OpsGenieAPIKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OpsGenie API KEY: %w", err)
+			return nil, retrieveSecretErr("opsGenieApiKey", err)
 		}
 		out.OpsGenieAPIKey = opsGenieAPIKey
 	}

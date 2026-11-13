@@ -9248,6 +9248,40 @@ func TestSanitizeRocketChatConfig(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name:           "rocketchat_configs message_text dropped for unsupported versions",
+			againstVersion: semver.Version{Major: 0, Minor: 34},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:      "http://example.com",
+								MessageText: `{{ .CommonAnnotations.summary }}`,
+							},
+						},
+					},
+				},
+			},
+			golden: "rocketchat_configs_message_text_unsupported_version.golden",
+		},
+		{
+			name:           "rocketchat_configs message_text kept for supported versions",
+			againstVersion: semver.Version{Major: 0, Minor: 35},
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						RocketChatConfigs: []*rocketChatConfig{
+							{
+								APIURL:      "http://example.com",
+								MessageText: `{{ .CommonAnnotations.summary }}`,
+							},
+						},
+					},
+				},
+			},
+			golden: "rocketchat_configs_message_text_supported_version.golden",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.in.sanitize(tc.againstVersion, logger)

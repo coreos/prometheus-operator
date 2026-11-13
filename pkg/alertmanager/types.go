@@ -523,6 +523,7 @@ type rocketChatConfig struct {
 	ThumbURL    string                        `yaml:"thumb_url,omitempty"`
 	LinkNames   bool                          `yaml:"link_names"`
 	Actions     []*rocketchatAttachmentAction `yaml:"actions,omitempty"`
+	MessageText string                        `yaml:"message_text,omitempty"`
 }
 
 type mattermostConfig struct {

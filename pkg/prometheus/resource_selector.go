@@ -1036,7 +1036,7 @@ func (rs *ResourceSelector) validateDockerSDConfigs(ctx context.Context, sc *mon
 	return nil
 }
 func (rs *ResourceSelector) validateLinodeSDConfigs(ctx context.Context, sc *monitoringv1alpha1.ScrapeConfig) error {
-	if len(sc.Spec.LinodeSDConfigs) > 0 && !rs.version.GTE(semver.MustParse("2.28.0")) {
+	if len(sc.Spec.LinodeSDConfigs) > 0 && rs.version.LT(semver.MustParse("2.28.0")) {
 		return fmt.Errorf("linode SD configuration is only supported for Prometheus version >= 2.28.0")
 	}
 

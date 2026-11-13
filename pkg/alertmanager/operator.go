@@ -1459,13 +1459,13 @@ func checkPagerDutyConfigs(
 
 		if config.RoutingKey != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.RoutingKey, validation.NotEmpty); err != nil {
-				return fmt.Errorf("routingKey: %w", err)
+				return retrieveSecretErr("routingKey", err)
 			}
 		}
 
 		if config.ServiceKey != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.ServiceKey, validation.NotEmpty); err != nil {
-				return fmt.Errorf("serviceKey: %w", err)
+				return retrieveSecretErr("serviceKey", err)
 			}
 		}
 
@@ -1494,7 +1494,7 @@ func checkOpsGenieConfigs(
 
 		if config.APIKey != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.APIKey); err != nil {
-				return err
+				return retrieveSecretErr("apiKey", err)
 			}
 		}
 
@@ -1542,7 +1542,7 @@ func checkDiscordConfigs(
 
 		url, err := store.GetSecretKey(ctx, namespace, config.APIURL)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve API URL: %w", err)
+			return retrieveSecretErr("apiURL", err)
 		}
 		if err := validation.ValidateSecretURL(strings.TrimSpace(url)); err != nil {
 			return fmt.Errorf("failed to validate API URL: %w", err)
@@ -1577,11 +1577,11 @@ func checkRocketChatConfigs(
 		}
 
 		if _, err := store.GetSecretKey(ctx, namespace, config.Token); err != nil {
-			return fmt.Errorf("failed to retrieve RocketChat token: %w", err)
+			return retrieveSecretErr("token", err)
 		}
 
 		if _, err := store.GetSecretKey(ctx, namespace, config.TokenID); err != nil {
-			return fmt.Errorf("failed to retrieve RocketChat token ID: %w", err)
+			return retrieveSecretErr("tokenID", err)
 		}
 	}
 
@@ -1605,7 +1605,7 @@ func checkSlackConfigs(
 			var err error
 			slackAPIURL, err = store.GetSecretKey(ctx, namespace, *config.APIURL)
 			if err != nil {
-				return err
+				return retrieveSecretErr("apiURL", err)
 			}
 			if err := validation.ValidateSecretURL(strings.TrimSpace(slackAPIURL)); err != nil {
 				return fmt.Errorf("failed to validate API URL: %w", err)
@@ -1650,7 +1650,7 @@ func checkWebhookConfigs(
 		if config.URLSecret != nil {
 			url, err := store.GetSecretKey(ctx, namespace, *config.URLSecret)
 			if err != nil {
-				return err
+				return retrieveSecretErr("urlSecret", err)
 			}
 
 			if err := validation.ValidateTemplateURL(strings.TrimSpace(url)); err != nil {
@@ -1684,7 +1684,7 @@ func checkWechatConfigs(
 
 		if config.APISecret != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.APISecret); err != nil {
-				return err
+				return retrieveSecretErr("apiSecret", err)
 			}
 		}
 
@@ -1749,12 +1749,12 @@ func checkEmailConfigs(
 	for _, config := range configs {
 		if config.AuthPassword != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.AuthPassword); err != nil {
-				return err
+				return retrieveSecretErr("authPassword", err)
 			}
 		}
 		if config.AuthSecret != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.AuthSecret); err != nil {
-				return err
+				return retrieveSecretErr("authSecret", err)
 			}
 		}
 
@@ -1787,7 +1787,7 @@ func checkVictorOpsConfigs(
 		}
 		if config.APIKey != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.APIKey); err != nil {
-				return err
+				return retrieveSecretErr("apiKey", err)
 			}
 		}
 
@@ -1813,7 +1813,7 @@ func checkPushoverConfigs(
 
 		_, err := store.GetSecretKey(ctx, namespace, *secret, validation.NotEmpty)
 		if err != nil {
-			return fmt.Errorf("'%s': %w", name, err)
+			return retrieveSecretErr(name, err)
 		}
 
 		return nil
@@ -1917,7 +1917,7 @@ func checkTelegramConfigs(
 
 		if config.BotToken != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.BotToken); err != nil {
-				return err
+				return retrieveSecretErr("botToken", err)
 			}
 		}
 
@@ -1950,7 +1950,7 @@ func checkMSTeamsConfigs(
 		}
 
 		if _, err := store.GetSecretKey(ctx, namespace, config.WebhookURL); err != nil {
-			return err
+			return retrieveSecretErr("webhookUrl", err)
 		}
 
 		if err := configureHTTPConfigInStore(ctx, config.HTTPConfig, namespace, store); err != nil {
@@ -1979,7 +1979,7 @@ func checkMSTeamsV2Configs(
 	for _, config := range configs {
 		if config.WebhookURL != nil {
 			if _, err := store.GetSecretKey(ctx, namespace, *config.WebhookURL, validation.NotEmpty); err != nil {
-				return fmt.Errorf("webhookURL: %w", err)
+				return retrieveSecretErr("webhookURL", err)
 			}
 		}
 
@@ -2187,4 +2187,8 @@ func ApplyConfigurationFromAlertmanager(a *monitoringv1.Alertmanager, updateScal
 	}
 
 	return monitoringv1ac.Alertmanager(a.Name, a.Namespace).WithStatus(asac)
+}
+
+func retrieveSecretErr(secretName string, err error) error {
+	return fmt.Errorf("failed to retrieve secret '%s': %w", secretName, err)
 }

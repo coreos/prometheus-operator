@@ -721,7 +721,7 @@ func (in *AutoGomemlimitSpec) DeepCopyInto(out *AutoGomemlimitSpec) {
 	}
 	if in.RefreshInterval != nil {
 		in, out := &in.RefreshInterval, &out.RefreshInterval
-		*out = new(Duration)
+		*out = new(GoDuration)
 		**out = **in
 	}
 }

@@ -25,8 +25,9 @@ import (
 // with apply.
 //
 // AutoGomemlimitSpec defines the automatic GOMEMLIMIT command line flags when starting Alertmanager.
+// It requires Alertmanager >= v0.35.0.
 type AutoGomemlimitSpecApplyConfiguration struct {
-	// enabled enables automatically setting GOMEMLIMIT to match the
+	// enabled sets GOMEMLIMIT to match the
 	// Linux container or system memory limit. This corresponds to the
 	// Alertmanager's `--auto-gomemlimit` flag.
 	Enabled *bool `json:"enabled,omitempty"`
@@ -34,14 +35,12 @@ type AutoGomemlimitSpecApplyConfiguration struct {
 	// maximum container or system memory. The value must be greater than 0 and
 	// less than or equal to 1. This corresponds to the Alertmanager's
 	// `--auto-gomemlimit.ratio` flag.
-	// It defaults to 0.9 in Alertmanager.
 	Ratio *resource.Quantity `json:"ratio,omitempty"`
 	// refreshInterval defines the interval at which to re-detect the container
 	// or system memory limit and update GOMEMLIMIT accordingly. It is useful
 	// when the limit can change at runtime, e.g. with a Vertical Pod Autoscaler.
 	// This corresponds to the Alertmanager's `--auto-gomemlimit.refresh-interval` flag.
-	// It requires Alertmanager >= v0.35.0.
-	RefreshInterval *monitoringv1.Duration `json:"refreshInterval,omitempty"`
+	RefreshInterval *monitoringv1.GoDuration `json:"refreshInterval,omitempty"`
 }
 
 // AutoGomemlimitSpecApplyConfiguration constructs a declarative configuration of the AutoGomemlimitSpec type for use with
@@ -69,7 +68,7 @@ func (b *AutoGomemlimitSpecApplyConfiguration) WithRatio(value resource.Quantity
 // WithRefreshInterval sets the RefreshInterval field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RefreshInterval field is set to the value of the last call.
-func (b *AutoGomemlimitSpecApplyConfiguration) WithRefreshInterval(value monitoringv1.Duration) *AutoGomemlimitSpecApplyConfiguration {
+func (b *AutoGomemlimitSpecApplyConfiguration) WithRefreshInterval(value monitoringv1.GoDuration) *AutoGomemlimitSpecApplyConfiguration {
 	b.RefreshInterval = &value
 	return b
 }

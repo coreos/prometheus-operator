@@ -592,7 +592,7 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
 				Enabled:         new(true),
 				Ratio:           new(resource.MustParse("0.7")),
-				RefreshInterval: new(monitoringv1.Duration("5m")),
+				RefreshInterval: new(monitoringv1.GoDuration("5m")),
 			},
 			expectedArgs: nil,
 		},
@@ -601,9 +601,19 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 			version:  "v0.35.0",
 			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
 				Ratio:           new(resource.MustParse("0.7")),
-				RefreshInterval: new(monitoringv1.Duration("5m")),
+				RefreshInterval: new(monitoringv1.GoDuration("5m")),
 			},
 			expectedArgs: nil,
+		},
+		{
+			scenario: "auto-gomemlimit explicitly disabled",
+			version:  "v0.35.0",
+			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
+				Enabled:         new(false),
+				Ratio:           new(resource.MustParse("0.7")),
+				RefreshInterval: new(monitoringv1.GoDuration("5m")),
+			},
+			expectedArgs: []string{"--no-auto-gomemlimit"},
 		},
 		{
 			scenario: "auto-gomemlimit enabled without ratio and refresh interval",
@@ -619,7 +629,7 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 			autoGomemlimit: &monitoringv1.AutoGomemlimitSpec{
 				Enabled:         new(true),
 				Ratio:           new(resource.MustParse("0.7")),
-				RefreshInterval: new(monitoringv1.Duration("5m")),
+				RefreshInterval: new(monitoringv1.GoDuration("5m")),
 			},
 			expectedArgs: []string{
 				"--auto-gomemlimit",
@@ -658,7 +668,7 @@ func TestMakeStatefulSetSpecAutoGomemlimit(t *testing.T) {
 			args := ss.Template.Spec.Containers[0].Args
 			gotArgs := make([]string, 0)
 			for _, arg := range args {
-				if strings.HasPrefix(arg, "--auto-gomemlimit") {
+				if strings.Contains(arg, "auto-gomemlimit") {
 					gotArgs = append(gotArgs, arg)
 				}
 			}

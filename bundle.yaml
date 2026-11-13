@@ -15120,7 +15120,7 @@ spec:
                 properties:
                   enabled:
                     description: |-
-                      enabled enables automatically setting GOMEMLIMIT to match the
+                      enabled sets GOMEMLIMIT to match the
                       Linux container or system memory limit. This corresponds to the
                       Alertmanager's `--auto-gomemlimit` flag.
                     type: boolean
@@ -15133,7 +15133,6 @@ spec:
                       maximum container or system memory. The value must be greater than 0 and
                       less than or equal to 1. This corresponds to the Alertmanager's
                       `--auto-gomemlimit.ratio` flag.
-                      It defaults to 0.9 in Alertmanager.
                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                     x-kubernetes-int-or-string: true
                   refreshInterval:
@@ -15142,8 +15141,7 @@ spec:
                       or system memory limit and update GOMEMLIMIT accordingly. It is useful
                       when the limit can change at runtime, e.g. with a Vertical Pod Autoscaler.
                       This corresponds to the Alertmanager's `--auto-gomemlimit.refresh-interval` flag.
-                      It requires Alertmanager >= v0.35.0.
-                    pattern: ^(0|(([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
+                    pattern: ^(0|(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?)$
                     type: string
                 type: object
                 x-kubernetes-validations:

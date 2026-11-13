@@ -480,7 +480,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.SlackAPIURL != nil {
 		slackAPIURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.SlackAPIURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get Slack API URL: %w", err)
+			return nil, retrieveSecretErr("slackApiUrl", err)
 		}
 		u, err := url.Parse(slackAPIURL)
 		if err != nil {
@@ -492,7 +492,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.OpsGenieAPIURL != nil {
 		opsgenieAPIURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.OpsGenieAPIURL)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OpsGenie API URL: %w", err)
+			return nil, retrieveSecretErr("opsGenieApiUrl", err)
 		}
 		u, err := url.Parse(opsgenieAPIURL)
 		if err != nil {
@@ -504,7 +504,7 @@ func (cb *ConfigBuilder) convertGlobalConfig(ctx context.Context, in *monitoring
 	if in.OpsGenieAPIKey != nil {
 		opsGenieAPIKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.OpsGenieAPIKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get OpsGenie API KEY: %w", err)
+			return nil, retrieveSecretErr("opsGenieApiKey", err)
 		}
 		out.OpsGenieAPIKey = opsGenieAPIKey
 	}
@@ -1309,7 +1309,7 @@ func (cb *ConfigBuilder) convertEmailConfig(ctx context.Context, in monitoringv1
 	if in.AuthPassword != nil {
 		authPassword, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.AuthPassword)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get auth password: %w", err)
+			return nil, retrieveSecretErr("authPassword", err)
 		}
 		out.AuthPassword = authPassword
 	}
@@ -1317,7 +1317,7 @@ func (cb *ConfigBuilder) convertEmailConfig(ctx context.Context, in monitoringv1
 	if in.AuthSecret != nil {
 		authSecret, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.AuthSecret)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get auth secret: %w", err)
+			return nil, retrieveSecretErr("authSecret", err)
 		}
 		out.AuthSecret = authSecret
 	}
@@ -1362,7 +1362,7 @@ func (cb *ConfigBuilder) convertVictorOpsConfig(ctx context.Context, in monitori
 	if in.APIKey != nil {
 		apiKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.APIKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get API key: %w", err)
+			return nil, retrieveSecretErr("apiKey", err)
 		}
 		out.APIKey = apiKey
 	}
@@ -1429,7 +1429,7 @@ func (cb *ConfigBuilder) convertPushoverConfig(ctx context.Context, in monitorin
 		if in.UserKey != nil {
 			userKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.UserKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get user key: %w", err)
+				return nil, retrieveSecretErr("userKey", err)
 			}
 			if userKey == "" {
 				return nil, fmt.Errorf("mandatory field %q is empty", "userKey")
@@ -1443,7 +1443,7 @@ func (cb *ConfigBuilder) convertPushoverConfig(ctx context.Context, in monitorin
 		if in.Token != nil {
 			token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get token: %w", err)
+				return nil, retrieveSecretErr("token", err)
 			}
 			if token == "" {
 				return nil, fmt.Errorf("mandatory field %q is empty", "token")
@@ -1507,7 +1507,7 @@ func (cb *ConfigBuilder) convertTelegramConfig(ctx context.Context, in monitorin
 	if in.BotToken != nil {
 		botToken, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.BotToken)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get bot token: %w", err)
+			return nil, retrieveSecretErr("botToken", err)
 		}
 		out.BotToken = botToken
 	}
@@ -1579,12 +1579,12 @@ func (cb *ConfigBuilder) convertSnsConfig(ctx context.Context, in monitoringv1al
 		if in.Sigv4.AccessKey != nil && in.Sigv4.SecretKey != nil {
 			accessKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Sigv4.AccessKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get access key: %w", err)
+				return nil, retrieveSecretErr("sigv4.accessKey", err)
 			}
 
 			secretKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Sigv4.SecretKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get AWS secret key: %w", err)
+				return nil, retrieveSecretErr("sigv4.secretKey", err)
 			}
 			out.Sigv4.AccessKey = accessKey
 			out.Sigv4.SecretKey = secretKey
@@ -1615,7 +1615,7 @@ func (cb *ConfigBuilder) convertMSTeamsConfig(
 
 	webHookURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, in.WebhookURL)
 	if err != nil {
-		return nil, err
+		return nil, retrieveSecretErr("webhookURL", err)
 	}
 
 	out.WebhookURL = webHookURL
@@ -1647,7 +1647,7 @@ func (cb *ConfigBuilder) convertMSTeamsV2Config(
 	if in.WebhookURL != nil {
 		webHookURL, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.WebhookURL)
 		if err != nil {
-			return nil, err
+			return nil, retrieveSecretErr("webhookURL", err)
 		}
 
 		out.WebhookURL = webHookURL
@@ -2015,7 +2015,7 @@ func (cb *ConfigBuilder) convertGlobalTelegramConfig(ctx context.Context, out *g
 	if in.BotToken != nil {
 		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.BotToken)
 		if err != nil {
-			return fmt.Errorf("failed to get Telegram Token: %w", err)
+			return retrieveSecretErr("botToken", err)
 		}
 		out.TelegramBotToken = token
 	}
@@ -2059,7 +2059,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	if in.Token != nil {
 		token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.Token)
 		if err != nil {
-			return fmt.Errorf("failed to get Rocket Chat Token: %w", err)
+			return retrieveSecretErr("token", err)
 		}
 		out.RocketChatToken = token
 	}
@@ -2067,7 +2067,7 @@ func (cb *ConfigBuilder) convertGlobalRocketChatConfig(ctx context.Context, out 
 	if in.TokenID != nil {
 		tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.TokenID)
 		if err != nil {
-			return fmt.Errorf("failed to get Rocket Chat Token ID: %w", err)
+			return retrieveSecretErr("tokenID", err)
 		}
 		out.RocketChatTokenID = tokenID
 	}
@@ -2107,7 +2107,7 @@ func (cb *ConfigBuilder) convertGlobalWeChatConfig(ctx context.Context, out *glo
 	if in.APISecret != nil {
 		apiSecret, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.APISecret)
 		if err != nil {
-			return fmt.Errorf("failed to get WeChat Secret: %w", err)
+			return retrieveSecretErr("apiSecret", err)
 		}
 		out.WeChatAPISecret = apiSecret
 	}
@@ -2135,7 +2135,7 @@ func (cb *ConfigBuilder) convertGlobalVictorOpsConfig(ctx context.Context, out *
 	if in.APIKey != nil {
 		apiSecret, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.APIKey)
 		if err != nil {
-			return fmt.Errorf("failed to get VictorOps Secret: %w", err)
+			return retrieveSecretErr("apiKey", err)
 		}
 		out.VictorOpsAPIKey = apiSecret
 	}
@@ -2151,7 +2151,7 @@ func (cb *ConfigBuilder) convertGlobalMattermostConfig(ctx context.Context, out 
 	if in.WebhookURL != nil {
 		webhookURLStr, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.WebhookURL)
 		if err != nil {
-			return fmt.Errorf("failed to get Mattermost Webhook URL Secret: %w", err)
+			return retrieveSecretErr("webhookURL", err)
 		}
 		u, err := url.Parse(webhookURLStr)
 		if err != nil {
@@ -3796,7 +3796,7 @@ func (cb *ConfigBuilder) checkGlobalTelegramConfig(ctx context.Context, tc *moni
 
 	if tc.BotToken != nil {
 		if _, err := cb.store.GetSecretKey(ctx, namespace, *tc.BotToken); err != nil {
-			return err
+			return retrieveSecretErr("botToken", err)
 		}
 	}
 
@@ -3830,7 +3830,7 @@ func (cb *ConfigBuilder) checkGlobalVictorOpsConfig(
 
 	if vc.APIKey != nil {
 		if _, err := cb.store.GetSecretKey(ctx, namespace, *vc.APIKey); err != nil {
-			return err
+			return retrieveSecretErr("apiKey", err)
 		}
 	}
 
@@ -3852,13 +3852,13 @@ func (cb *ConfigBuilder) checkGlobalRocketChatConfig(
 
 	if rc.Token != nil {
 		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.Token); err != nil {
-			return err
+			return retrieveSecretErr("token", err)
 		}
 	}
 
 	if rc.TokenID != nil {
 		if _, err := cb.store.GetSecretKey(ctx, namespace, *rc.TokenID); err != nil {
-			return err
+			return retrieveSecretErr("tokenID", err)
 		}
 	}
 
@@ -3888,7 +3888,7 @@ func (cb *ConfigBuilder) checkGlobalWeChatConfig(
 
 	if wc.APISecret != nil {
 		if _, err := cb.store.GetSecretKey(ctx, namespace, *wc.APISecret); err != nil {
-			return err
+			return retrieveSecretErr("apiSecret", err)
 		}
 	}
 
@@ -3911,7 +3911,7 @@ func (cb *ConfigBuilder) checkGlobalMattermostConfig(
 	if mc.WebhookURL != nil {
 		url, err := cb.store.GetSecretKey(ctx, namespace, *mc.WebhookURL)
 		if err != nil {
-			return fmt.Errorf("failed to retrieve Mattermost Webhook URL: %w", err)
+			return retrieveSecretErr("webhookURL", err)
 		}
 		if err := validation.ValidateSecretURL(strings.TrimSpace(url)); err != nil {
 			return fmt.Errorf("failed to validate Mattermost Webhook URL: %w", err)

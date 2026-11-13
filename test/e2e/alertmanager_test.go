@@ -1561,11 +1561,7 @@ func testAlertmanagerConfigCRD(t *testing.T) {
 	err = wait.PollUntilContextTimeout(context.Background(), 5*time.Second, 2*time.Minute, false, func(ctx context.Context) (bool, error) {
 		cfgSecret, err := framework.KubeClient.CoreV1().Secrets(ns).Get(ctx, amConfigSecretName, metav1.GetOptions{})
 		if err != nil {
-			// Keep the previous error (e.g. the config diff) when the
-			// poll's own deadline cancels the request.
-			if ctx.Err() == nil {
-				lastErr = fmt.Errorf("failed to get generated configuration secret: %w", err)
-			}
+			lastErr = fmt.Errorf("failed to get generated configuration secret: %w", err)
 			return false, nil
 		}
 

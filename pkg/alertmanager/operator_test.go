@@ -22,6 +22,7 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	authv1 "k8s.io/api/authorization/v1"
@@ -2326,9 +2327,6 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 	defaultVersion, err := semver.ParseTolerant(operator.DefaultAlertmanagerVersion)
 	require.NoError(t, err)
 
-	version27, err := semver.ParseTolerant("v0.27.0")
-	require.NoError(t, err)
-
 	version34, err := semver.ParseTolerant("v0.34.0")
 	require.NoError(t, err)
 
@@ -2367,6 +2365,7 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 		amConfig *monitoringv1alpha1.AlertmanagerConfig
 		version  *semver.Version
 		ok       bool
+		errMsg   *string
 	}{
 		{
 			amConfig: newAMConfig("rocketchat-message-text-unsupported-version", monitoringv1alpha1.RocketChatConfig{
@@ -2382,6 +2381,7 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 			}),
 			version: &version34,
 			ok:      false,
+			errMsg:  new("'messageText' is available in Alertmanager >= 0.35.0 only - current 0.34.0"),
 		},
 		{
 			amConfig: newAMConfig("rocketchat-message-text-supported-version", monitoringv1alpha1.RocketChatConfig{
@@ -2415,6 +2415,11 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 
 			t.Logf("err: %s", err)
 			require.Error(t, err)
+
+			if tc.errMsg != nil {
+				assert.EqualError(t, err, *tc.errMsg)
+				return
+			}
 		})
 	}
 }

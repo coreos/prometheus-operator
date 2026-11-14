@@ -3516,6 +3516,12 @@ func (ic *incidentioConfig) sanitize(amVersion semver.Version, logger *slog.Logg
 		return errors.New("at least one of alert_source_token, alert_source_token_file or http_config.authorization must be configured")
 	}
 
+	if ic.Metadata != nil && amVersion.LT(semver.MustParse("0.35.0")) {
+		msg := "'metadata' supported in Alertmanager >= 0.35.0 only - dropping field from provided config"
+		logger.Warn(msg, "current_version", amVersion.String())
+		ic.Metadata = nil
+	}
+
 	return ic.HTTPConfig.sanitize(amVersion, logger)
 }
 

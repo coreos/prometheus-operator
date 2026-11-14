@@ -35,6 +35,7 @@ import (
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"github.com/prometheus-operator/prometheus-operator/pkg/operator"
+	"github.com/prometheus-operator/prometheus-operator/pkg/prometheus/validation"
 )
 
 // Config defines the operator's parameters for the Prometheus controllers.
@@ -207,6 +208,15 @@ func (cg *ConfigGenerator) validateRemoteWriteSpec(spec monitoringv1.RemoteWrite
 				return fmt.Errorf("the provided Azure Workload Identity tenantId is invalid")
 			}
 		}
+	}
+
+	lcv, err := validation.NewLabelConfigValidatorFromVersion(cg.version)
+	if err != nil {
+		return fmt.Errorf("failed to create the relabel configuration validator: %w", err)
+	}
+
+	if err := lcv.Validate(spec.WriteRelabelConfigs); err != nil {
+		return fmt.Errorf("invalid writeRelabelConfigs: %w", err)
 	}
 
 	return spec.Validate()

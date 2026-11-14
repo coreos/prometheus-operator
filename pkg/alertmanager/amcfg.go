@@ -233,6 +233,7 @@ type ConfigBuilder struct {
 	amVersion semver.Version
 	store     *assets.StoreBuilder
 	enforcer  enforcer
+	am        *monitoringv1.Alertmanager
 }
 
 func NewConfigBuilder(logger *slog.Logger, amVersion semver.Version, store *assets.StoreBuilder, am *monitoringv1.Alertmanager) *ConfigBuilder {
@@ -241,6 +242,7 @@ func NewConfigBuilder(logger *slog.Logger, amVersion semver.Version, store *asse
 		amVersion: amVersion,
 		store:     store,
 		enforcer:  getEnforcer(am.Spec.AlertmanagerConfigMatcherStrategy, amVersion, am.Namespace),
+		am:        am,
 	}
 	return cg
 }
@@ -279,7 +281,7 @@ func (cb *ConfigBuilder) initializeFromAlertmanagerConfig(ctx context.Context, g
 		Name:      amConfig.Name,
 	}
 
-	if err := checkAlertmanagerConfigResource(ctx, amConfig, cb.amVersion, cb.store); err != nil {
+	if err := checkAlertmanagerConfigResource(ctx, cb.am, amConfig, cb.amVersion, cb.store); err != nil {
 		return err
 	}
 
@@ -829,6 +831,17 @@ func (cb *ConfigBuilder) convertReceiver(ctx context.Context, in *monitoringv1al
 func (cb *ConfigBuilder) convertRocketChatConfig(ctx context.Context, in monitoringv1alpha1.RocketChatConfig, crKey types.NamespacedName) (*rocketChatConfig, error) {
 	out := &rocketChatConfig{
 		SendResolved: in.SendResolved,
+		Channel:      ptr.Deref(in.Channel, ""),
+		Color:        ptr.Deref(in.Color, ""),
+		Title:        ptr.Deref(in.Title, ""),
+		TitleLink:    ptr.Deref(in.TitleLink, ""),
+		Text:         ptr.Deref(in.Text, ""),
+		ShortFields:  ptr.Deref(in.ShortFields, false),
+		Emoji:        ptr.Deref(in.Emoji, ""),
+		IconURL:      ptr.Deref(in.IconURL, ""),
+		ImageURL:     ptr.Deref(in.ImageURL, ""),
+		ThumbURL:     ptr.Deref(in.ThumbURL, ""),
+		LinkNames:    ptr.Deref(in.LinkNames, false),
 	}
 
 	if in.APIURL != nil && *in.APIURL != "" {
@@ -846,36 +859,6 @@ func (cb *ConfigBuilder) convertRocketChatConfig(ctx context.Context, in monitor
 		return nil, fmt.Errorf("failed to get RocketChat token ID: %w", err)
 	}
 	out.TokenID = &tokenID
-
-	if in.Channel != nil && *in.Channel != "" {
-		out.Channel = *in.Channel
-	}
-
-	if in.Color != nil && *in.Color != "" {
-		out.Color = *in.Color
-	}
-
-	if in.Title != nil && *in.Title != "" {
-		out.Title = *in.Title
-	}
-
-	if in.TitleLink != nil && *in.TitleLink != "" {
-		out.TitleLink = *in.TitleLink
-	}
-
-	if in.Text != nil && *in.Text != "" {
-		out.Text = *in.Text
-	}
-
-	if in.ShortFields != nil {
-		out.ShortFields = *in.ShortFields
-	}
-
-	out.Emoji = ptr.Deref(in.Emoji, "")
-	out.IconURL = ptr.Deref(in.IconURL, "")
-	out.ImageURL = ptr.Deref(in.ImageURL, "")
-	out.ThumbURL = ptr.Deref(in.ThumbURL, "")
-	out.LinkNames = ptr.Deref(in.LinkNames, false)
 
 	fields := make([]*rocketchatAttachmentField, len(in.Fields))
 	for i, f := range in.Fields {
@@ -1545,7 +1528,10 @@ func (cb *ConfigBuilder) convertTelegramConfig(ctx context.Context, in monitorin
 	// Confirm botToken is specified for either global or receiver
 	if out.BotToken == "" && out.BotTokenFile == "" {
 		if cb.cfg.Global == nil || (cb.cfg.Global.TelegramBotToken == "" && cb.cfg.Global.TelegramBotTokenFile == "") {
-			return nil, fmt.Errorf("mandatory field %q is empty", "botToken")
+			if cb.amVersion.LT(semver.MustParse("0.26.0")) {
+				return nil, errors.New(`missing mandatory field 'botToken'`)
+			}
+			return nil, errors.New(`missing mandatory field 'botToken' or 'botTokenFile'`)
 		}
 	}
 

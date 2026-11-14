@@ -2322,6 +2322,98 @@ func TestCheckDiscordAlertmanagerConfig(t *testing.T) {
 	}
 }
 
+func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
+	version27, err := semver.ParseTolerant("v0.27.0")
+	require.NoError(t, err)
+
+	version34, err := semver.ParseTolerant("v0.34.0")
+	require.NoError(t, err)
+
+	version35, err := semver.ParseTolerant("v0.35.0")
+	require.NoError(t, err)
+
+	c := fake.NewClientset(
+		&corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rocketchat",
+				Namespace: "ns1",
+			},
+			Data: map[string][]byte{
+				"token":    []byte("abcdef"),
+				"token-id": []byte("abcdef12345"),
+			},
+		},
+	)
+
+	newAMConfig := func(name string, rc monitoringv1alpha1.RocketChatConfig) *monitoringv1alpha1.AlertmanagerConfig {
+		rc.Token = corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+			Key:                  "token",
+		}
+		rc.TokenID = corev1.SecretKeySelector{
+			LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+			Key:                  "token-id",
+		}
+
+		return &monitoringv1alpha1.AlertmanagerConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: "ns1",
+			},
+			Spec: monitoringv1alpha1.AlertmanagerConfigSpec{
+				Receivers: []monitoringv1alpha1.Receiver{{
+					Name:              "recv1",
+					RocketChatConfigs: []monitoringv1alpha1.RocketChatConfig{rc},
+				}},
+			},
+		}
+	}
+
+	for _, tc := range []struct {
+		amConfig *monitoringv1alpha1.AlertmanagerConfig
+		version  semver.Version
+		ok       bool
+	}{
+		{
+			amConfig: newAMConfig("rocketchat-unsupported-version", monitoringv1alpha1.RocketChatConfig{}),
+			version:  version27,
+			ok:       false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-without-message-text", monitoringv1alpha1.RocketChatConfig{}),
+			version:  version34,
+			ok:       true,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-message-text-unsupported-version", monitoringv1alpha1.RocketChatConfig{
+				MessageText: new("{{ .CommonAnnotations.summary }}"),
+			}),
+			version: version34,
+			ok:      false,
+		},
+		{
+			amConfig: newAMConfig("rocketchat-message-text-supported-version", monitoringv1alpha1.RocketChatConfig{
+				MessageText: new("{{ .CommonAnnotations.summary }}"),
+			}),
+			version: version35,
+			ok:      true,
+		},
+	} {
+		t.Run(tc.amConfig.Name, func(t *testing.T) {
+			store := assets.NewStoreBuilder(c.CoreV1(), c.CoreV1())
+
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, tc.version, store)
+			if tc.ok {
+				require.NoError(t, err)
+				return
+			}
+
+			t.Logf("err: %s", err)
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestCheckWebhookAlertmanagerConfig(t *testing.T) {
 	defaultVersion, err := semver.ParseTolerant(operator.DefaultAlertmanagerVersion)
 	require.NoError(t, err)

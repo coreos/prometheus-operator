@@ -837,13 +837,13 @@ func (cb *ConfigBuilder) convertRocketChatConfig(ctx context.Context, in monitor
 
 	token, err := cb.store.GetSecretKey(ctx, crKey.Namespace, in.Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get RocketChat token: %w", err)
+		return nil, retrieveSecretErr("token", err)
 	}
 	out.Token = &token
 
 	tokenID, err := cb.store.GetSecretKey(ctx, crKey.Namespace, in.TokenID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get RocketChat token ID: %w", err)
+		return nil, retrieveSecretErr("tokenID", err)
 	}
 	out.TokenID = &tokenID
 
@@ -885,7 +885,7 @@ func (cb *ConfigBuilder) convertWebhookConfig(ctx context.Context, in monitoring
 	if in.URLSecret != nil {
 		url, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.URLSecret)
 		if err != nil {
-			return nil, err
+			return nil, retrieveSecretErr("urlSecret", err)
 		}
 
 		out.URL = url
@@ -1086,7 +1086,7 @@ func (cb *ConfigBuilder) convertPagerdutyConfig(ctx context.Context, in monitori
 	if in.RoutingKey != nil {
 		routingKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.RoutingKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get routing key: %w", err)
+			return nil, retrieveSecretErr("routingKey", err)
 		}
 		out.RoutingKey = routingKey
 	}
@@ -1094,7 +1094,7 @@ func (cb *ConfigBuilder) convertPagerdutyConfig(ctx context.Context, in monitori
 	if in.ServiceKey != nil {
 		serviceKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.ServiceKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get service key: %w", err)
+			return nil, retrieveSecretErr("serviceKey", err)
 		}
 		out.ServiceKey = serviceKey
 	}
@@ -1177,7 +1177,7 @@ func (cb *ConfigBuilder) convertOpsgenieConfig(ctx context.Context, in monitorin
 	if in.APIKey != nil {
 		apiKey, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.APIKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get API key: %w", err)
+			return nil, retrieveSecretErr("apiKey", err)
 		}
 		out.APIKey = apiKey
 	}
@@ -1234,7 +1234,7 @@ func (cb *ConfigBuilder) convertWeChatConfig(ctx context.Context, in monitoringv
 	if in.APISecret != nil {
 		apiSecret, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.APISecret)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get API secret: %w", err)
+			return nil, retrieveSecretErr("apiSecret", err)
 		}
 		out.APISecret = apiSecret
 	}
@@ -1818,7 +1818,7 @@ func (cb *ConfigBuilder) convertSMTPConfig(ctx context.Context, out *globalConfi
 	if in.AuthPassword != nil {
 		authPassword, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.AuthPassword)
 		if err != nil {
-			return err
+			return retrieveSecretErr("authPassword", err)
 		}
 		out.SMTPAuthPassword = authPassword
 	}
@@ -1826,7 +1826,7 @@ func (cb *ConfigBuilder) convertSMTPConfig(ctx context.Context, out *globalConfi
 	if in.AuthSecret != nil {
 		authSecret, err := cb.store.GetSecretKey(ctx, crKey.Namespace, *in.AuthSecret)
 		if err != nil {
-			return err
+			return retrieveSecretErr("authSecret", err)
 		}
 		out.SMTPAuthSecret = authSecret
 	}

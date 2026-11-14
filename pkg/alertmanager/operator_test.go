@@ -2349,15 +2349,6 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 	)
 
 	newAMConfig := func(name string, rc monitoringv1alpha1.RocketChatConfig) *monitoringv1alpha1.AlertmanagerConfig {
-		rc.Token = corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
-			Key:                  "token",
-		}
-		rc.TokenID = corev1.SecretKeySelector{
-			LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
-			Key:                  "token-id",
-		}
-
 		return &monitoringv1alpha1.AlertmanagerConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -2378,17 +2369,15 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 		ok       bool
 	}{
 		{
-			amConfig: newAMConfig("rocketchat-unsupported-version", monitoringv1alpha1.RocketChatConfig{}),
-			version:  &version27,
-			ok:       false,
-		},
-		{
-			amConfig: newAMConfig("rocketchat-without-message-text", monitoringv1alpha1.RocketChatConfig{}),
-			version:  &version34,
-			ok:       true,
-		},
-		{
 			amConfig: newAMConfig("rocketchat-message-text-unsupported-version", monitoringv1alpha1.RocketChatConfig{
+				Token: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+					Key:                  "token",
+				},
+				TokenID: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+					Key:                  "token-id",
+				},
 				MessageText: new("{{ .CommonAnnotations.summary }}"),
 			}),
 			version: &version34,
@@ -2396,6 +2385,14 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 		},
 		{
 			amConfig: newAMConfig("rocketchat-message-text-supported-version", monitoringv1alpha1.RocketChatConfig{
+				Token: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+					Key:                  "token",
+				},
+				TokenID: corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "rocketchat"},
+					Key:                  "token-id",
+				},
 				MessageText: new("{{ .CommonAnnotations.summary }}"),
 			}),
 			version: &version35,

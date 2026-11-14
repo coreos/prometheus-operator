@@ -2374,31 +2374,31 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 
 	for _, tc := range []struct {
 		amConfig *monitoringv1alpha1.AlertmanagerConfig
-		version  semver.Version
+		version  *semver.Version
 		ok       bool
 	}{
 		{
 			amConfig: newAMConfig("rocketchat-unsupported-version", monitoringv1alpha1.RocketChatConfig{}),
-			version:  version27,
+			version:  &version27,
 			ok:       false,
 		},
 		{
 			amConfig: newAMConfig("rocketchat-without-message-text", monitoringv1alpha1.RocketChatConfig{}),
-			version:  version34,
+			version:  &version34,
 			ok:       true,
 		},
 		{
 			amConfig: newAMConfig("rocketchat-message-text-unsupported-version", monitoringv1alpha1.RocketChatConfig{
 				MessageText: new("{{ .CommonAnnotations.summary }}"),
 			}),
-			version: version34,
+			version: &version34,
 			ok:      false,
 		},
 		{
 			amConfig: newAMConfig("rocketchat-message-text-supported-version", monitoringv1alpha1.RocketChatConfig{
 				MessageText: new("{{ .CommonAnnotations.summary }}"),
 			}),
-			version: version35,
+			version: &version35,
 			ok:      true,
 		},
 	} {

@@ -11034,6 +11034,9 @@ func TestSanitizeSlackConfig(t *testing.T) {
 	versionSlackUpdateMessageAllowed := semver.Version{Major: 0, Minor: 32}
 	versionSlackUpdateMessageNotAllowed := semver.Version{Major: 0, Minor: 31}
 
+	versionSlackPostUpdatesToThreadAllowed := semver.Version{Major: 0, Minor: 35}
+	versionSlackPostUpdatesToThreadNotAllowed := semver.Version{Major: 0, Minor: 34}
+
 	for _, tc := range []struct {
 		name           string
 		againstVersion semver.Version
@@ -11205,6 +11208,54 @@ func TestSanitizeSlackConfig(t *testing.T) {
 				},
 			},
 			expectErr: true,
+		},
+		{
+			name:           "Test slack post_updates_to_thread unsupported version",
+			againstVersion: versionSlackPostUpdatesToThreadNotAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						SlackConfigs: []*slackConfig{
+							{
+								PostUpdatesToThread: new(true),
+							},
+						},
+					},
+				},
+			},
+			golden: "test_slack_post_updates_to_thread_unsupported_version.golden",
+		},
+		{
+			name:           "Test slack post_updates_to_thread supported version",
+			againstVersion: versionSlackPostUpdatesToThreadAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						SlackConfigs: []*slackConfig{
+							{
+								PostUpdatesToThread: new(true),
+							},
+						},
+					},
+				},
+			},
+			golden: "test_slack_post_updates_to_thread_supported_version.golden",
+		},
+		{
+			name:           "Test slack post_updates_to_thread set to false supported version",
+			againstVersion: versionSlackPostUpdatesToThreadAllowed,
+			in: &alertmanagerConfig{
+				Receivers: []*receiver{
+					{
+						SlackConfigs: []*slackConfig{
+							{
+								PostUpdatesToThread: new(false),
+							},
+						},
+					},
+				},
+			},
+			golden: "test_slack_post_updates_to_thread_false_supported_version.golden",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

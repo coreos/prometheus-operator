@@ -2323,6 +2323,9 @@ func TestCheckDiscordAlertmanagerConfig(t *testing.T) {
 }
 
 func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
+	defaultVersion, err := semver.ParseTolerant(operator.DefaultAlertmanagerVersion)
+	require.NoError(t, err)
+
 	version27, err := semver.ParseTolerant("v0.27.0")
 	require.NoError(t, err)
 
@@ -2402,7 +2405,12 @@ func TestCheckRocketChatAlertmanagerConfig(t *testing.T) {
 		t.Run(tc.amConfig.Name, func(t *testing.T) {
 			store := assets.NewStoreBuilder(c.CoreV1(), c.CoreV1())
 
-			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, tc.version, store)
+			amVersion := defaultVersion
+			if tc.version != nil {
+				amVersion = *tc.version
+			}
+
+			err := checkAlertmanagerConfigResource(context.Background(), allowAllFileSystemAM(), tc.amConfig, amVersion, store)
 			if tc.ok {
 				require.NoError(t, err)
 				return
